@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "Canvassing Tracker",
+    "slug": "canvassing-tracker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#111827"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.canvassingtracker.app",
+      "config": {
+        "googleMapsApiKey": "REPLACE_WITH_EXPO_PUBLIC_GOOGLE_MAPS_IOS_KEY_AT_BUILD_TIME"
+      },
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Canvassing Tracker uses your location while you're clocked in to show your position on the neighborhood map and detect when you've left a house you just visited, so it can prompt you to log the outcome.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Canvassing Tracker needs background location while you're clocked in so it can keep tracking your route between houses and automatically stop tracking the moment you leave the neighborhood in a vehicle. Location is never collected outside your shift.",
+        "UIBackgroundModes": ["location"]
+      }
+    },
+    "android": {
+      "package": "com.canvassingtracker.app",
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_BACKGROUND_LOCATION", "FOREGROUND_SERVICE"]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Canvassing Tracker needs background location while you're clocked in so it can track your canvassing route and automatically stop the moment you leave the neighborhood in a vehicle."
+        }
+      ]
+    ]
+  }
+}

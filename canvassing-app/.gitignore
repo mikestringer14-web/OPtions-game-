@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.env
+*.log
+
+# server
+server/prisma/dev.db
+server/reports/
+
+# mobile / expo
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+mobile/*.jks
+mobile/*.p8
+mobile/*.p12
+mobile/*.key
+mobile/*.mobileprovision
