@@ -1,0 +1,123 @@
+// Canvassing Tracker - data model
+// SQLite for local/dev use. Swap the datasource to Postgres for production
+// by changing `provider` and `url` (see server/.env.example).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite has no native enum type, so Role and VisitOutcome are plain
+// Strings here, validated against the unions in src/types.ts at the API
+// boundary. Switching the datasource to Postgres later can promote these
+// back to real `enum` blocks (CANVASSER|MANAGER|ADMIN and the 8
+// VisitOutcome values documented in src/types.ts) for DB-level enforcement.
+
+model Employee {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  pinCode       String    // simple 4-6 digit PIN for clock-in on shared devices
+  role          String    @default("CANVASSER") // CANVASSER | MANAGER | ADMIN
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+
+  workSessions  WorkSession[]
+  visits        Visit[]
+}
+
+model CanvassArea {
+  id              String   @id @default(cuid())
+  name            String
+  // GeoJSON Polygon [[lng,lat],...] describing the neighborhood boundary.
+  // Used to (a) know which houses belong to this area and (b) detect when
+  // a device has left the area entirely (privacy auto-pause, see AGPS notes).
+  boundaryGeoJson String
+  managerEmails   String   // comma-separated list of report recipients
+  createdAt       DateTime @default(now())
+
+  houses          House[]
+  workSessions    WorkSession[]
+}
+
+model House {
+  id                 String    @id @default(cuid())
+  areaId             String
+  area               CanvassArea @relation(fields: [areaId], references: [id])
+  address            String
+  lat                Float
+  lng                Float
+  // Optional building footprint polygon (GeoJSON [[lng,lat],...]) sourced
+  // from OpenStreetMap building data or Google Maps Building Insights, used
+  // to draw the 2D house outline on the map. Falls back to a generated
+  // square footprint around lat/lng when null (see geofence.ts).
+  footprintGeoJson   String?
+  status             String?   // VisitOutcome, see src/types.ts
+  lastVisitedAt      DateTime?
+  createdAt          DateTime  @default(now())
+
+  visits             Visit[]
+
+  @@index([areaId])
+}
+
+model Visit {
+  id          String       @id @default(cuid())
+  houseId     String
+  house       House        @relation(fields: [houseId], references: [id])
+  employeeId  String
+  employee    Employee     @relation(fields: [employeeId], references: [id])
+  outcome     String       // VisitOutcome, see src/types.ts
+  notes       String?
+  lat         Float
+  lng         Float
+  timestamp   DateTime     @default(now())
+
+  @@index([houseId])
+  @@index([employeeId])
+}
+
+model WorkSession {
+  id             String    @id @default(cuid())
+  employeeId     String
+  employee       Employee  @relation(fields: [employeeId], references: [id])
+  areaId         String
+  area           CanvassArea @relation(fields: [areaId], references: [id])
+  clockInAt      DateTime  @default(now())
+  clockOutAt     DateTime?
+  // Set when the auto-pause feature detects the device left the canvass
+  // area at driving speed (privacy shutoff). Distinct from a manual clock-out.
+  autoPausedAt   DateTime?
+  trackPoints    TrackPoint[]
+
+  @@index([employeeId])
+  @@index([areaId])
+}
+
+model TrackPoint {
+  id             String      @id @default(cuid())
+  sessionId      String
+  session        WorkSession @relation(fields: [sessionId], references: [id])
+  lat            Float
+  lng            Float
+  speedMps       Float?      // meters/sec, from CLLocation.speed
+  timestamp      DateTime    @default(now())
+
+  @@index([sessionId])
+}
+
+model DailyReport {
+  id           String    @id @default(cuid())
+  areaId       String
+  date         String    // YYYY-MM-DD
+  pdfPath      String
+  recipients   String
+  emailedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@unique([areaId, date])
+}
