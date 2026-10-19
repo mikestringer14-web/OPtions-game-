@@ -1,0 +1,39 @@
+//@version=6
+// Strategy A: Trend Breakout, spot only, long only, no leverage.
+// Use on DAILY candles: COINBASE:BTCUSD, COINBASE:ETHUSD, COINBASE:SOLUSD.
+// Commission 0.8% per side = Coinbase Advanced taker fee (~0.6%) + spread/slippage (~0.2%).
+// If you only ever use post-only limit orders (maker ~0.4%), you can test at 0.6%.
+strategy("A: Trend Breakout (spot, long only)", overlay = true, initial_capital = 100,
+     default_qty_type = strategy.percent_of_equity, default_qty_value = 90,
+     commission_type = strategy.commission.percent, commission_value = 0.8, pyramiding = 0)
+
+entryLen = input.int(20, "Breakout lookback (bars)", minval = 5)
+exitLen  = input.int(10, "Exit lookback (bars)", minval = 3)
+trendLen = input.int(100, "Trend filter EMA", minval = 20)
+atrLen   = input.int(14, "ATR length")
+atrMult  = input.float(3.0, "ATR trailing stop multiple", step = 0.5)
+fromYear = input.int(2020, "Test from year")
+toYear   = input.int(2026, "Test to year (inclusive)")
+
+inRange = year(time) >= fromYear and year(time) <= toYear
+hiN     = ta.highest(high, entryLen)[1]
+loN     = ta.lowest(low, exitLen)[1]
+ema     = ta.ema(close, trendLen)
+atr     = ta.atr(atrLen)
+
+var float trail = na
+if strategy.position_size == 0
+    trail := na
+    if inRange and close > hiN and close > ema
+        strategy.entry("Long", strategy.long)
+else
+    cand = close - atrMult * atr
+    trail := na(trail) ? cand : math.max(trail, cand)
+    strategy.exit("Exit", "Long", stop = math.max(trail, loN))
+
+if not inRange and strategy.position_size > 0
+    strategy.close("Long", comment = "outside test window")
+
+plot(hiN, "Breakout level", color.new(color.green, 0))
+plot(ema, "Trend EMA", color.new(color.orange, 0))
+plot(strategy.position_size > 0 ? math.max(nz(trail, loN), loN) : na, "Stop", color.new(color.red, 0), style = plot.style_linebr)

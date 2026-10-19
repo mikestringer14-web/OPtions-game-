@@ -1,0 +1,34 @@
+//@version=6
+// Strategy B: RSI(2) pullback inside an uptrend, long only, no leverage.
+// Use on DAILY candles. Two ways to test it:
+//   Crypto:  COINBASE:BTCUSD / ETHUSD  -> commission 0.8
+//   ETF:     TSX:VFV or TSX:XIU (buy on Wealthsimple, $0 commission on Canadian ETFs) -> commission 0.05
+strategy("B: RSI(2) Pullback in Uptrend", overlay = true, initial_capital = 100,
+     default_qty_type = strategy.percent_of_equity, default_qty_value = 90,
+     commission_type = strategy.commission.percent, commission_value = 0.8, pyramiding = 0)
+
+rsiLen   = input.int(2, "RSI length", minval = 2)
+buyBelow = input.float(10.0, "Buy when RSI below")
+trendLen = input.int(200, "Uptrend filter SMA")
+exitLen  = input.int(5, "Exit when close above SMA")
+maxBars  = input.int(10, "Time stop (bars)")
+stopPct  = input.float(8.0, "Hard stop %", step = 0.5)
+fromYear = input.int(2018, "Test from year")
+toYear   = input.int(2026, "Test to year (inclusive)")
+
+inRange = year(time) >= fromYear and year(time) <= toYear
+r       = ta.rsi(close, rsiLen)
+trend   = ta.sma(close, trendLen)
+exitMa  = ta.sma(close, exitLen)
+
+if strategy.position_size == 0 and inRange and close > trend and r < buyBelow
+    strategy.entry("Long", strategy.long)
+
+if strategy.position_size > 0
+    strategy.exit("Hard stop", "Long", stop = strategy.position_avg_price * (1 - stopPct / 100))
+    barsHeld = bar_index - strategy.opentrades.entry_bar_index(0)
+    if close > exitMa or barsHeld >= maxBars or not inRange
+        strategy.close("Long")
+
+plot(trend, "Uptrend SMA", color.new(color.orange, 0))
+plot(exitMa, "Exit SMA", color.new(color.blue, 0))
