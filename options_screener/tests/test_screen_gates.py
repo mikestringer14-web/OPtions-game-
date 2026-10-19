@@ -22,7 +22,7 @@ def test_baseline_passes_all_three(world, cfg):
     c = res.candidates[0]
     assert c.gate_a and c.gate_b and c.gate_c and c.direction == "bull"
     assert c.snapshot.contract.right == "C" and c.fill.label == "VERIFIED"
-    assert c.plan["time_stop"].startswith("10:30") and "limit at mid" in c.plan["entry_order"]
+    assert c.plan["time_stop"].startswith("10:30") and "limit between mid" in c.plan["entry_order"]
     assert c.iv_crush_risk is True
 
 
@@ -80,11 +80,15 @@ def test_bearish_setup_picks_a_put(world, cfg):
     assert res.candidates and res.candidates[0].direction == "bear" and res.candidates[0].snapshot.contract.right == "P"
 
 
-def test_premium_cap_and_delta_band(world, cfg):
+def test_premium_cap_and_delta_band(world, cfg, cfg100):
+    # the old US$300 premium cap is replaced by the C$100 affordability rule (ask + fees + FX)
     v, cats, sessions = world
-    v.chains["ABC"] = [fakes.snapshot("ABC", EXPIRY, 100.0, mid=3.5), fakes.snapshot("ABC", EXPIRY, 90.0, delta=0.9)]
+    v.chains["ABC"] = [fakes.snapshot("ABC", EXPIRY, 90.0, delta=0.9)]
     res = run(world, cfg)
     assert res.candidates == [] and res.rejected["no eligible contract"] == 1
+    v.chains["ABC"] = [fakes.snapshot("ABC", EXPIRY, 100.0, mid=3.5)]
+    res = run(world, cfg100)
+    assert res.candidates == [] and res.rejected["unaffordable at C$100"] == 1
 
 
 def test_screen_refuses_unguarded_view(world, cfg):
@@ -170,6 +174,10 @@ def test_move_proxy(cfg):
     d = ASOF
     up = fakes.minute_bars(d, lambda i: 100.0 if i < 5 else 100.0 + min(i - 5, 60) * 0.025)
     flat = fakes.minute_bars(d, [100.0] * 390)
-    assert signals.morning_option_move_proxy(up, 0.3, cfg) > 5
-    assert signals.morning_option_move_proxy(flat, 0.3, cfg) == 0.0
+    # proxy now returns a walk-forward MoveResult; the old float behaviour lives on as *_legacy
+    r = signals.morning_option_move_proxy(up, 0.3, cfg)
+    assert r.hit_target and r.exit_reason == "target"
+    assert signals.morning_option_move_proxy(flat, 0.3, cfg).exit_reason == "no_trigger"
+    assert signals.morning_option_move_proxy_legacy(up, 0.3, cfg) > 5
+    assert signals.morning_option_move_proxy_legacy(flat, 0.3, cfg) == 0.0
     assert signals.move_potential_rate([up] * 6 + [flat] * 4, 0.3, cfg) == pytest.approx(0.6)

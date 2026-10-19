@@ -115,10 +115,10 @@ def test_mock_screen_report_renders(tmp_path):
 
 
 def test_status_defaults_to_research(monkeypatch):
-    for k in ("IBKR_PORT", "HISTORICAL_OPTIONS_PROVIDER", "ALPHAVANTAGE_API_KEY"):
+    for k in ("MASSIVE_API_KEY", "HISTORICAL_OPTIONS_PROVIDER", "ALPHAVANTAGE_API_KEY"):
         monkeypatch.delenv(k, raising=False)
     s = status.gather(config_mod.load())
-    assert s["mode"] == "RESEARCH" and "(paper port)" in s["ibkr"]
+    assert s["mode"].startswith("RESEARCH") and "ibkr" not in s and "MISSING" in s["massive_api_key"]
 
 
 def test_csv_providers_round_trip(tmp_path):

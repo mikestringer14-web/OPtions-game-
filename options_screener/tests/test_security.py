@@ -1,4 +1,4 @@
-"""Order code only in paper.py; the screen's IBKR connection is read-only; no secrets in the repo."""
+"""RESEARCH ONLY: no order code anywhere, no broker module on the screen path, no secrets in the repo."""
 import re
 import subprocess
 from pathlib import Path
@@ -27,24 +27,22 @@ def repo_files():
         return [p for p in PKG.rglob("*") if p.is_file() and ".venv" not in p.parts and "cache" not in p.parts]
 
 
-def test_order_calls_only_in_paper_py():
+def test_no_order_calls_anywhere():
     offenders = []
     for p in source_files():
-        if p.name == "paper.py":
-            continue
         for i, line in enumerate(p.read_text().splitlines(), 1):
             if ORDER_CALLS.search(line) and not line.strip().startswith("#"):
                 offenders.append(f"{p.relative_to(PKG)}:{i}: {line.strip()}")
     assert offenders == [], offenders
+    assert not (PKG / "paper.py").exists()
 
 
-def test_paper_py_actually_contains_the_order_code():
-    assert ORDER_CALLS.search((PKG / "paper.py").read_text())
-
-
-def test_screen_connection_is_read_only_and_paper_port_only():
+def test_optional_ibkr_provider_stays_read_only_and_unused():
     src = (PKG / "providers" / "ibkr.py").read_text()
     assert "readonly=True" in src and "PAPER_PORTS" in src
+    for p in source_files():
+        if p.name != "ibkr.py":
+            assert "providers.ibkr" not in p.read_text() and "from .ibkr" not in p.read_text(), p
 
 
 def test_no_secrets_in_repo_files():

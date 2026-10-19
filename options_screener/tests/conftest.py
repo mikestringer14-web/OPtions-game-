@@ -20,6 +20,13 @@ EXPIRY = date(2026, 10, 23)
 
 @pytest.fixture
 def cfg():
+    # The gate scenarios use a $2.80 option (US$281/contract). capital_cad is raised here so those
+    # scenarios still test gates A/B/C; the C$100 rules are tested with `cfg100` (the real config).
+    return config_mod.load(overrides={"universe": {"symbols": ["ABC"]}, "account": {"capital_cad": 1000}})
+
+
+@pytest.fixture
+def cfg100():
     return config_mod.load(overrides={"universe": {"symbols": ["ABC"]}})
 
 

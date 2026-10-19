@@ -1,5 +1,6 @@
-ib_async==2.1.0
 exchange_calendars==4.13.2
 requests>=2.31
 python-dotenv>=1.0
 pytest>=8.0
+ruff>=0.6
+# Optional, NOT used by the screen: ib_async is only needed if you ever revive providers/ibkr.py.

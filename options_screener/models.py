@@ -1,4 +1,4 @@
-"""Plain data types shared by the screen, backtest and paper modules."""
+"""Plain data types shared by the screen, report and backtest modules."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -68,6 +68,9 @@ class OptionSnapshot:
     bid_size: Optional[float] = None
     ask_size: Optional[float] = None
     synthetic: bool = False
+    multiplier: int = 100            # shares per contract (verified from the source when it reports it)
+    ask_estimated: bool = False      # True = no real quote; ask is a MODEL ESTIMATE (close + proxy half-spread)
+    iv_source: str = ""              # "" | "derived" (Black-Scholes from the EOD close)
 
     @property
     def mid(self) -> Optional[float]:
@@ -146,3 +149,9 @@ class Candidate:
     plan: Optional[dict] = None
     notes: list = field(default_factory=list)
     reject_reason: str = ""
+    sizing: Optional[object] = None             # sizing.Sizing
+    move_rate_legacy: Optional[float] = None    # old optimistic proxy, for comparison only
+    move_stretch_rate: Optional[float] = None   # share of mornings reaching +10% before stop / time stop
+    earnings_time_verified: bool = True
+    scenarios: Optional[dict] = None
+    debit_spread: Optional[dict] = None

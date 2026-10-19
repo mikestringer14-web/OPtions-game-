@@ -62,16 +62,16 @@ def test_depth_rejects(cfg):
 
 
 def test_round_trip_cost_rejects_cheap_options(cfg):
-    # $0.60 option: commissions alone (2 x $1.05) are 3.5% of a $60 position > 40% of the +5% target
-    cheap = fakes.snapshot("ABC", EXPIRY, 100.0, mid=0.60)
-    fq = assess(cfg, snap=cheap, days=[fakes.good_option_day(ASOF, mid=0.60) for _ in range(3)])
+    # $0.08 option: fees alone (2 x $0.10 buffer) are 2.5% of an $8 position > 40% of the +5% target
+    cheap = fakes.snapshot("ABC", EXPIRY, 100.0, mid=0.08)
+    fq = assess(cfg, snap=cheap, days=[fakes.good_option_day(ASOF, mid=0.08) for _ in range(3)])
     assert status(fq, "round_trip_cost_pct") == "FAIL"
 
 
 def test_round_trip_math(cfg):
     c = cfg["costs"]
-    assert fqm.commission_per_side(1, c) == pytest.approx(1.05)        # max(1.00, 0.65) + 0.05
-    assert fqm.round_trip_cost_pct(1.0, 2.0, 1, c) == pytest.approx(1.0 + 2.10 / 200 * 100)
+    assert fqm.commission_per_side(1, c) == pytest.approx(0.10)        # fee buffer, no commission
+    assert fqm.round_trip_cost_pct(1.0, 2.0, 1, c) == pytest.approx(1.0 + 0.20 / 200 * 100)
 
 
 def test_proxy_label_without_quotes(cfg):

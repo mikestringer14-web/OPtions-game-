@@ -1,5 +1,5 @@
-"""DataView for backtests: underlying history from one source, option bars from a
-HistoricalOptionsProvider (IBKR cannot serve EXPIRED options), or an underlying proxy."""
+"""DataView for backtests and the `synthetic` provider: underlying history from one source,
+option bars from a HistoricalOptionsProvider, or an UNDERLYING PROXY (Black-Scholes)."""
 from __future__ import annotations
 
 from .. import pricing
@@ -43,3 +43,15 @@ class HistoricalView:
         for b in bars:          # proxy bars carry no real quotes
             b.bid = b.ask = None
         return bars
+
+
+def synthetic_market(cfg, end, symbols=None):
+    """--provider synthetic: the deterministic mock underlying, options built ONLY by Black-Scholes
+    from it (no quotes, no OI). Returns (view, catalysts). Not market data."""
+    from .mock import MockWorld
+
+    world = MockWorld(symbols, end=end)
+    view = HistoricalView(world, None, cfg)
+    view.name = "SYNTHETIC (mock underlying + Black-Scholes proxy options; not market data)"
+    view.symbols = world.symbols
+    return view, world

@@ -16,6 +16,9 @@ PROFILE = {
     "SPY": (560, 0.16, 0), "QQQ": (480, 0.21, 0), "AAPL": (225, 0.27, 0), "NVDA": (130, 0.55, 0),
     "TSLA": (240, 0.62, 0), "AMD": (150, 0.55, 1), "META": (560, 0.38, 1), "AMZN": (190, 0.33, 0),
     "MSFT": (420, 0.24, 1), "NFLX": (700, 0.42, 2), "JPM": (210, 0.22, 2), "XOM": (115, 0.24, 3),
+    # low-priced names: the only ones whose near-the-money options can fit a C$100 budget
+    "F": (12, 0.33, 1), "SOFI": (15, 0.58, 1), "AAL": (13, 0.48, 2), "NIO": (5, 0.70, 2),
+    "BAC": (45, 0.24, 0), "INTC": (22, 0.48, 0), "T": (27, 0.20, 1), "PLTR": (40, 0.60, 0),
 }
 TIER = {0: dict(spread=0.8, vol=60, trades=14, oi=20000, size=200), 1: dict(spread=1.6, vol=25, trades=6, oi=6000, size=60),
         2: dict(spread=4.5, vol=6, trades=1.5, oi=1500, size=12), 3: dict(spread=12.0, vol=1, trades=0.3, oi=300, size=4)}
@@ -41,7 +44,7 @@ class MockWorld:
         self.seed = seed
         # by default a few names report on the as-of session (demo); plus a regular cadence
         if earnings_on is None:
-            earnings_on = {s: [self.end] for s in ("NVDA", "TSLA", "AMD", "NFLX", "XOM")}
+            earnings_on = {s: [self.end] for s in ("NVDA", "TSLA", "AMD", "NFLX", "XOM", "SOFI", "F")}
         self._earn = {s: set(earnings_on.get(s, [])) for s in self.symbols}
         for i, s in enumerate(self.symbols):
             self._earn[s] |= {d for j, d in enumerate(self.sessions) if (j + 11 * i) % 45 == 0}

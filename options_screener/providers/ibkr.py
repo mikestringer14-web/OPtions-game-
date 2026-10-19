@@ -1,4 +1,7 @@
-"""IBKR (TWS / IB Gateway) READ-ONLY data view via ib_async, for the evening screen.
+"""OPTIONAL, UNUSED BY DEFAULT. Nothing in the screen, report or backtest imports this module, and
+ib_async is not a requirement. Kept only in case a read-only IBKR data feed is wanted later.
+
+IBKR (TWS / IB Gateway) READ-ONLY data view via ib_async.
 
   * Connects with readonly=True and only to the paper ports (7497 TWS, 4002 Gateway).
   * Every historical request goes through the pacing limiter (see ratelimit.py).

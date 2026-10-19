@@ -1,4 +1,9 @@
-"""IBKR historical-data pacing (interactivebrokers.github.io/tws-api/historical_limitations.html):
+"""Request pacing.
+
+SlidingWindowLimiter: N calls per window, one per bucket (Massive free tier: 5 requests/minute,
+counted separately per asset class; massive.com/knowledge-base/article/what-is-the-request-limit-for-massives-restful-apis).
+
+PacingLimiter (kept for the optional, unused-by-default providers/ibkr.py): IBKR historical-data pacing (interactivebrokers.github.io/tws-api/historical_limitations.html):
 
   * max 50 simultaneous open historical requests
   * no identical request within 15 seconds
@@ -60,5 +65,29 @@ class PacingLimiter:
                     self._by_contract[contract_key].append(now)
                     self._last_identical[request_key] = now
                     return waited
+            self.sleep(wait)
+            waited += wait
+
+
+class SlidingWindowLimiter:
+    """At most `max_calls` in any `window_s` seconds. acquire() blocks; returns seconds waited."""
+
+    def __init__(self, max_calls: int = 5, window_s: float = 60.0,
+                 clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep):
+        self.max_calls, self.window_s, self.clock, self.sleep = max_calls, window_s, clock, sleep
+        self._calls: deque = deque()
+        self._lock = threading.Lock()
+
+    def acquire(self) -> float:
+        waited = 0.0
+        while True:
+            with self._lock:
+                now = self.clock()
+                while self._calls and now - self._calls[0] >= self.window_s:
+                    self._calls.popleft()
+                if len(self._calls) < self.max_calls:
+                    self._calls.append(now)
+                    return waited
+                wait = self._calls[0] + self.window_s - now
             self.sleep(wait)
             waited += wait

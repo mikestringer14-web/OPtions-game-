@@ -1,12 +1,13 @@
-"""Backtest + validation + the PASS gate that unlocks paper mode.
+"""Backtest + validation + the single-position C$100 model. RESEARCH ONLY (no orders, ever).
 
-    python -m options_screener.backtest --start 2024-01-01 --end 2026-09-30
-    python -m options_screener.backtest --start 2026-03-01 --end 2026-09-30 --mock
+    python -m options_screener.backtest --start 2026-03-01 --end 2026-09-30 --provider mock
+    python -m options_screener.backtest --start 2026-03-01 --end 2026-09-30 --provider synthetic
+    python -m options_screener.backtest --start 2024-01-01 --end 2026-09-30 --provider csv   # your own data/
 
 For each past session D the screen runs on an AsOfView fixed at the PRIOR close (no lookahead),
 then the morning plan is simulated on D's 1-minute bars. Without a historical options provider
 the run is an UNDERLYING-PROXY approximation, the fill-quality gate is UNVERIFIED, and the gate
-can never PASS (proxy results must not unlock paper trading). Mock data can never PASS either.
+can never PASS. Mock / synthetic data can never PASS either: they are NOT evidence of a real edge.
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ from dataclasses import asdict, dataclass
 from datetime import date, datetime
 
 from . import config as config_mod
-from . import market_calendar, signals, sim, stats
+from . import market_calendar, signals, sim, sizing, stats
 from .config import PASS_FILE, REPORTS, config_hash
 from .models import TORONTO
 from .providers.base import AsOfView, NullCatalysts, NullNews, ProviderUnavailable
@@ -80,6 +81,96 @@ class Simulator:
                                  meta={"earnings": c.earnings, "score": c.combined, "fq_score": fq.score})
                 trades.append(t)
         return trades
+
+
+def single_position_c100(sim_, dcs, days, cfg, cad_usd=None, mode="MOCK"):
+    """ONE trade per day max: the top-ranked candidate that passed A+B+C AND was affordable at the
+    prior close's ask (section 2 sizing). Simulated with the stop / target / 10:30 time-stop exits.
+    Fixed C$100 stake per trade (no compounding). P/L in CAD after fees + FX buffer both ways."""
+    a = cfg["account"]
+    rate = cad_usd if cad_usd is not None else a["cad_usd_rate"]
+    best = {}
+    for dc in dcs:
+        c = dc.cand
+        if not (dc.passes_c and c.sizing and c.sizing.affordable):
+            continue
+        if dc.day not in best or c.combined > best[dc.day].cand.combined:
+            best[dc.day] = dc
+    rows = []
+    for d, dc in sorted(best.items()):
+        c, z = dc.cand, dc.cand.sizing
+        k = c.snapshot.contract
+        ob = sim_._get("opt", (k, d), lambda k=k, d=d: sim_.view.option_bars(k, d))
+        ub = sim_._get("und", (k.symbol, d), lambda k=k, d=d: sim_.view.intraday_bars(k.symbol, d))
+        t = sim.simulate(day=d, contract=k, direction=c.direction, option_bars=ob, underlying_bars=ub, cfg=cfg,
+                         hist_median_spread_pct=c.fill.median_spread_pct, quotes=sim_.view.has_quotes,
+                         meta={"earnings": c.earnings, "score": c.combined, "fq_score": c.fill.score, "contracts": z.contracts})
+        pl = None
+        if t.filled:
+            fee, mult = a["fee_per_contract_usd"], a["contract_multiplier"]
+            cost = sizing.usd_to_cad_cost(z.contracts * (t.entry_price * mult + fee), cfg, rate)
+            back = sizing.usd_to_cad_proceeds(z.contracts * (t.exit_price * mult - fee), cfg, rate)
+            pl = round(back - cost, 2)
+        rows.append({"day": d, "symbol": c.symbol, "contract": k.label(), "contracts": z.contracts, "status": t.status,
+                     "exit": t.exit_reason, "hit5": t.hit_target_mid, "hit10": t.hit_stretch_mid, "pl_cad": pl,
+                     "proxy_rate": c.move_rate, "legacy_rate": c.move_rate_legacy})
+    filled = [r for r in rows if r["pl_cad"] is not None]
+    eq, peak, dd = 0.0, 0.0, 0.0
+    for r in filled:
+        eq += r["pl_cad"]
+        peak = max(peak, eq)
+        dd = max(dd, peak - eq)
+    ab = [x.cand for x in dcs]
+
+    def avg(vals):
+        vals = [v for v in vals if v is not None]
+        return sum(vals) / len(vals) if vals else None
+
+    n = len(filled)
+    return {
+        "mode": mode, "not_evidence": mode in ("MOCK", "SYNTHETIC", "PROXY"),
+        "sessions": len(days), "days_with_trade_signal": len(rows), "filled": n,
+        "hit_rate_5": sum(r["hit5"] for r in filled) / n if n else None,
+        "hit_rate_10": sum(r["hit10"] for r in filled) / n if n else None,
+        "expectancy_cad": sum(r["pl_cad"] for r in filled) / n if n else None,
+        "total_cad": round(sum(r["pl_cad"] for r in filled), 2),
+        "worst_day_cad": min((r["pl_cad"] for r in filled), default=None),
+        "best_day_cad": max((r["pl_cad"] for r in filled), default=None),
+        "max_drawdown_cad": round(dd, 2), "max_drawdown_pct_of_capital": round(dd / a["capital_cad"] * 100, 1),
+        "unaffordable_days": len({x.day for x in dcs if x.passes_c and x.cand.sizing and not x.cand.sizing.affordable}
+                                 - set(best)),
+        "proxy_comparison": {
+            "candidates": len(ab),
+            "avg_new_proxy_rate": avg(c.move_rate for c in ab),           # +5% before stop / time stop
+            "avg_legacy_proxy_rate": avg(c.move_rate_legacy for c in ab),  # best price within 60 min, no stop
+            "realized_hit_rate_5": sum(r["hit5"] for r in filled) / n if n else None,
+        },
+        "trades": rows,
+    }
+
+
+def render_c100(m, cfg) -> list[str]:
+    a = cfg["account"]
+    pc = m["proxy_comparison"]
+    L = ["", f"## Single-position C${a['capital_cad']:g} model (one trade per day, sized at the ask, fees + FX in CAD)", ""]
+    if m["not_evidence"]:
+        L += [f"> **{m['mode']} data: NOT evidence of a real edge.** These numbers only show the plumbing works.", ""]
+    L += ["| metric | value |", "|---|---|",
+          f"| sessions | {m['sessions']} |", f"| days with an affordable A+B+C signal | {m['days_with_trade_signal']} |",
+          f"| days skipped only because unaffordable at C$100 | {m['unaffordable_days']} |",
+          f"| filled trades | {m['filled']} |",
+          f"| hit rate +5% before stop / time stop | {_f(m['hit_rate_5'])} |",
+          f"| hit rate +10% before stop / time stop | {_f(m['hit_rate_10'])} |",
+          f"| expectancy per trade (CAD) | {_f(m['expectancy_cad'])} |", f"| total (CAD) | {_f(m['total_cad'])} |",
+          f"| worst day (CAD) | {_f(m['worst_day_cad'])} |", f"| best day (CAD) | {_f(m['best_day_cad'])} |",
+          f"| max drawdown on C${a['capital_cad']:g} (CAD) | {_f(m['max_drawdown_cad'])} ({_f(m['max_drawdown_pct_of_capital'], 1)}%) |",
+          "", "### Move-potential proxy: legacy vs new", "",
+          "| measure | value |", "|---|---|",
+          f"| candidates (passed A+B) | {pc['candidates']} |",
+          f"| avg NEW proxy rate (+5% before -15% stop / 10:30, BS with decay) | {_f(pc['avg_new_proxy_rate'])} |",
+          f"| avg LEGACY proxy rate (best price within 60 min, no stop) | {_f(pc['avg_legacy_proxy_rate'])} |",
+          f"| realized +5% hit rate in the simulation | {_f(pc['realized_hit_rate_5'])} |"]
+    return L
 
 
 def _bucket_score(t):
@@ -169,7 +260,7 @@ METRIC_KEYS = ["entries_attempted", "filled", "fill_rate", "hit_rate_target", "w
                "avg_minutes_to_fill", "avg_minutes_held", "trades_per_day"]
 
 
-def render(r, start, end, source, cfg) -> str:
+def render(r, start, end, source, cfg, c100=None) -> str:
     L = [f"# Backtest {start} to {end}", "",
          "**Research only. Not financial advice. Options can lose 100%. Simulated results, not real trading.**", "",
          f"- Run: {datetime.now(TORONTO):%Y-%m-%d %H:%M %Z} | data: {source}",
@@ -196,15 +287,17 @@ def render(r, start, end, source, cfg) -> str:
     for name, groups in r["splits"].items():
         L += ["", f"## OOS split: {name}", "", "| bucket | filled | hit rate | expectancy $ | PF |", "|---|---|---|---|---|"]
         L += [f"| {k} | {m['filled']} | {_f(m['hit_rate_target'])} | {_f(m['expectancy_usd'])} | {_f(m['profit_factor'])} |" for k, m in groups.items()]
+    if c100:
+        L += render_c100(c100, cfg)
     return "\n".join(L) + "\n"
 
 
-def write(r, start, end, source, cfg):
+def write(r, start, end, source, cfg, c100=None):
     REPORTS.mkdir(parents=True, exist_ok=True)
-    stem = f"backtest_{datetime.now(TORONTO):%Y%m%d}" + ("_MOCK" if r["mode"] == "MOCK" else "")
+    stem = f"backtest_{datetime.now(TORONTO):%Y%m%d}" + (f"_{r['mode']}" if r["mode"] in ("MOCK", "SYNTHETIC") else "")
     md = REPORTS / f"{stem}.md"
-    md.write_text(render(r, start, end, source, cfg))
-    (REPORTS / f"{stem}.json").write_text(json.dumps(r, indent=2, default=str))
+    md.write_text(render(r, start, end, source, cfg, c100))
+    (REPORTS / f"{stem}.json").write_text(json.dumps({**r, "c100": c100}, indent=2, default=str))
     if r["verdict"] == "PASS":
         PASS_FILE.write_text(json.dumps({"verdict": "PASS", "config_hash": config_hash(cfg), "created": datetime.now(TORONTO).isoformat(),
                                          "start": str(start), "end": str(end), "mode": r["mode"], "oos": r["oos"]}, indent=2, default=str))
@@ -214,48 +307,54 @@ def write(r, start, end, source, cfg):
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="Backtest the morning screen (research only)")
+    ap = argparse.ArgumentParser(description="Backtest the morning screen (research only, no orders)")
     ap.add_argument("--start", required=True)
     ap.add_argument("--end", required=True)
-    ap.add_argument("--mock", action="store_true")
-    ap.add_argument("--underlying", choices=["ibkr", "csv"], default="csv")
+    ap.add_argument("--provider", choices=["mock", "synthetic", "csv"], default="csv",
+                    help="mock / synthetic are NOT market data; csv reads data/ (+ HISTORICAL_OPTIONS_PROVIDER)")
+    ap.add_argument("--mock", action="store_true", help="shorthand for --provider mock")
     ap.add_argument("--symbols")
     args = ap.parse_args(argv)
     config_mod.load_env()
     cfg = config_mod.load()
+    provider = "mock" if args.mock else args.provider
     start, end = date.fromisoformat(args.start), date.fromisoformat(args.end)
     days = market_calendar.sessions_between(start, end)
     symbols = args.symbols.split(",") if args.symbols else None
-    if args.mock:
+    if provider in ("mock", "synthetic"):
+        from .providers.historical import HistoricalView
         from .providers.mock import MockWorld
 
-        view = MockWorld(symbols, end=end, history_days=(end - start).days + 120, earnings_on={})
-        catalysts, mode, source, symbols = view, "MOCK", "MOCK synthetic data (not market data)", view.symbols
+        world = MockWorld(symbols, end=end, history_days=(end - start).days + 120, earnings_on={})
+        symbols = world.symbols
+        if provider == "mock":
+            view, catalysts, mode, source = world, world, "MOCK", "MOCK synthetic data (not market data)"
+        else:
+            view = HistoricalView(world, None, cfg)
+            catalysts, mode, source = world, "SYNTHETIC", "SYNTHETIC: mock underlying + BS proxy options (not market data)"
     else:
-        view, catalysts, mode, source = build_historical(cfg, args.underlying)
+        view, catalysts, mode, source = build_historical(cfg)
     news = NullNews()
     dcs = collect(view, catalysts, news, days, cfg, symbols, enforce_c=(mode != "PROXY"),
                   permissive_b=round(cfg["gates"]["move_signal_min"] - 0.05, 2),
                   progress=lambda i, n: print(f"\rscreened {i}/{n} sessions", end="", flush=True))
     print()
-    r = validate(dcs, days, Simulator(view, cfg), cfg, mode)
-    md = write(r, start, end, source, cfg)
+    simulator = Simulator(view, cfg)
+    r = validate(dcs, days, simulator, cfg, mode)
+    strict = [x for x in dcs if x.b_score >= cfg["gates"]["move_signal_min"]]
+    c100 = single_position_c100(simulator, strict, days, cfg, mode=mode)
+    md = write(r, start, end, source, cfg, c100)
     print(md.read_text())
     print(f"Wrote {md}")
     return 0
 
 
-def build_historical(cfg, underlying_kind):
+def build_historical(cfg):
     from .config import env
     from .providers.csv_provider import CSVEarnings, CSVOptions, CSVUnderlying
     from .providers.historical import HistoricalView
 
-    if underlying_kind == "ibkr":
-        from .providers.ibkr import IBKRView
-
-        und = IBKRView.connect_readonly(cfg)
-    else:
-        und = CSVUnderlying()
+    und = CSVUnderlying()
     kind = env("HISTORICAL_OPTIONS_PROVIDER", "none").lower()
     opts = None
     if kind == "massive":

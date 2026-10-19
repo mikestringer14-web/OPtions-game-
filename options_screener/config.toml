@@ -1,4 +1,25 @@
-# Options morning screener configuration. RESEARCH + PAPER ONLY.
+# Options morning screener configuration. RESEARCH ONLY: nothing here places, previews or routes orders.
+
+[data]
+provider = "mock"                         # mock | synthetic | massive  (override with --provider)
+# Massive FREE tier is 5 requests/min per asset class, so the live universe is kept small.
+massive_symbols = ["SPY","QQQ","IWM","AAPL","AMD","NVDA","TSLA","F","SOFI","AAL","PLTR","NIO","INTC","BAC","T"]
+cache_dir = "data/cache"
+
+[account]
+capital_cad = 100                         # total budget, hard cap
+max_risk_per_trade_pct = 100              # Mike accepts risking the full C$100 on one position
+max_open_positions = 1
+max_new_trades_per_day = 1
+cad_usd_rate = 0.72                       # fallback only; the screen tries the Bank of Canada Valet API (free, no key), cached daily
+fx_cost_pct = 1.5                         # ASSUMPTION: conversion cost buffer per conversion (CAD->USD on entry, USD->CAD on exit)
+fee_per_contract_usd = 0.10               # ASSUMPTION: per-contract fee buffer per side, not a broker figure
+contract_multiplier = 100                 # every contract is checked; anything else is rejected
+
+[strategies]
+actionable = ["long_call", "long_put"]                       # max loss = premium + fees
+research_only = ["call_debit_spread", "put_debit_spread"]    # shown for comparison only: not executable at Wealthsimple (no multi-leg)
+max_actionable = 3
 # Every threshold the spec names lives here. Changing anything in [gates], [fill_quality],
 # [plan] or [backtest] changes the config hash and re-locks paper mode until a new PASS.
 
@@ -19,7 +40,6 @@ symbols = [
   "DAL","UAL","LUV","MARA","RIOT","SOFI","AFRM","UPST","CVNA","CHWY",
 ]
 min_underlying_avg_volume = 2_000_000     # 20-day average shares/day
-max_premium_per_contract = 300.0          # USD (ask x 100) so 1 contract fits a $500 max
 
 [signals]
 # Weights for the combined score (sum does not need to be 1; scores are normalized by the
@@ -74,12 +94,12 @@ time_stop = "10:30"
 spread_widen_multiple = 2.0
 
 [costs]
-# IBKR Canada, US options, Tiered, <= 10,000 contracts/month, premium >= USD 0.10:
-# USD 0.65/contract, USD 1.00 minimum per order (interactivebrokers.ca/en/pricing/commissions-options.php).
-# Third-party fees per contract (OCC 0.025 + CAT 0.0003 + exchange/ORF estimate) ~= 0.05.
-commission_per_contract = 0.65
-min_commission_per_order = 1.00
-other_fees_per_contract = 0.05
+# Per-side trading costs used by the fill-quality round-trip check and the simulator.
+# Mirrors [account] fee_per_contract_usd (a buffer, not a broker figure). FX is NOT in here:
+# it is applied to CAD sizing and CAD P/L (see [account] fx_cost_pct).
+commission_per_contract = 0.0
+min_commission_per_order = 0.0
+other_fees_per_contract = 0.10
 extra_slippage_pct = 0.0                  # added on top of the spread, per side
 
 [backtest]

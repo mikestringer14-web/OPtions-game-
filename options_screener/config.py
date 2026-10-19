@@ -14,8 +14,8 @@ REPORTS = PKG / "reports"
 LOGS = PKG / "logs"
 DATA = PKG / "data"
 PASS_FILE = REPORTS / "PASS.json"
-PAPER_PORTS = frozenset({7497, 4002})     # IBKR defaults: TWS paper 7497, IB Gateway paper 4002
-LIVE_PORTS = frozenset({7496, 4001})
+PAPER_PORTS = frozenset({7497, 4002})     # used only by the optional, unused-by-default providers/ibkr.py
+PROVIDERS = ("mock", "synthetic", "massive")
 
 
 def load_env() -> None:
@@ -44,7 +44,7 @@ def merge(base: dict, extra: dict) -> dict:
 
 def config_hash(cfg: dict) -> str:
     """Hash of everything that affects which trades are taken and how."""
-    relevant = {k: cfg.get(k) for k in ("signals", "gates", "contract", "fill_quality", "plan", "costs", "backtest")}
+    relevant = {k: cfg.get(k) for k in ("signals", "gates", "contract", "fill_quality", "plan", "costs", "backtest", "account", "strategies")}
     return hashlib.sha256(json.dumps(relevant, sort_keys=True).encode()).hexdigest()[:16]
 
 

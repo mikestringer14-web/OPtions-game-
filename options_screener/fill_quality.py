@@ -51,9 +51,10 @@ def _check(name, value, ok, threshold, note="") -> Check:
 
 
 def evaluate(contract: Contract, snap: Optional[OptionSnapshot], days: list[list[Bar]], *, has_quotes: bool,
-             has_trade_counts: bool, cfg: dict, source: str) -> FillQuality:
+             has_trade_counts: bool, cfg: dict, source: str, n: Optional[int] = None) -> FillQuality:
+    """n = intended contracts (from sizing); defaults to [contract] contracts."""
     fq, costs = cfg["fill_quality"], cfg["costs"]
-    n = cfg["contract"]["contracts"]
+    n = n or cfg["contract"]["contracts"]
     target = cfg["plan"]["target_pct"]
     traded_days = [d for d in days if any((b.volume or 0) > 0 for b in d)]
 
@@ -127,21 +128,27 @@ def evaluate(contract: Contract, snap: Optional[OptionSnapshot], days: list[list
 
 # ---------------------------------------------------------------- contract choice
 
-def eligible(snaps: list[OptionSnapshot], right: str, on, cfg: dict) -> list[OptionSnapshot]:
+def eligible(snaps: list[OptionSnapshot], right: str, on, cfg: dict, rejected=None) -> list[OptionSnapshot]:
+    """Right / DTE / delta band / multiplier. Affordability (ask in CAD incl. fees + FX) is checked
+    separately by the screen so the funnel can say "unaffordable at C$100"."""
     c = cfg["contract"]
-    max_prem = cfg["universe"]["max_premium_per_contract"]
+    mult = cfg.get("account", {}).get("contract_multiplier", 100)
     min_dte = 0 if c["allow_0dte"] else max(1, c["dte_min"])
     out = []
     for s in snaps:
         k = s.contract
-        if k.right != right or s.delta is None or s.ask is None:
+        if k.right != right:
+            continue
+        if s.multiplier != mult:
+            if rejected is not None:
+                rejected[f"non-standard multiplier (not {mult})"] += 1
+            continue
+        if s.delta is None or s.ask is None:
             continue
         dte = k.dte(on)
         if not (min_dte <= dte <= c["dte_max"]):
             continue
         if not (c["delta_min"] <= abs(s.delta) <= c["delta_max"]):
-            continue
-        if s.ask * 100 > max_prem:
             continue
         out.append(s)
     return out

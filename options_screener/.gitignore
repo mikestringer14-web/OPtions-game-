@@ -9,7 +9,8 @@ __pycache__/
 # generated reports and the PASS file are local results, not source
 reports/*
 !reports/.gitkeep
-!reports/sample_screen_MOCK.md
+!reports/morning_screen_2026-10-20.md
+!reports/backtest_20261019_MOCK.md
 data/*
 !data/.gitkeep
 !data/README.md

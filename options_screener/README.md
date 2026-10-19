@@ -1,136 +1,130 @@
-# Options morning screener (RESEARCH + PAPER ONLY)
+# Options morning screener (RESEARCH ONLY, C$100, one position)
 
-An evening / weekend screen for **single-leg long calls or puts** that might gain **+5% in option
-price in the first 30-90 minutes after the open**, and whose recent trading history shows they can
-actually be bought and sold quickly. It also includes a backtest with a strict PASS gate, and an
-IBKR **paper**-account mode that stays locked until that gate passes.
+An evening / pre-market screen for **single-leg long calls or puts** that might gain **+5% (stretch
++10%) in option price between the open and 10:30 ET**, sized for **one position of up to C$100**,
+and whose recent trading shows they can actually be bought and sold.
 
-> **Research only. Not financial advice. Options can lose 100% of the premium.** Nothing in this
-> folder can send a live order. `paper.py` is the only order code. It runs only with `--paper`,
-> only after a PASS backtest on real option data, and only against an IBKR paper account.
+> **Research only. Not financial advice. Options can lose 100% of the premium.** No code path in
+> this folder places, previews or routes an order, connects to a broker, or calls a trading
+> endpoint. `paper.py` was removed. API keys are read from environment variables only and are
+> never printed or logged.
 
 ## What it does
 
-**Evening screen.** A candidate must pass **all three** gates. Each gate is cheaper to compute than
-the next, so they run in this order:
+A candidate must pass **all three** gates **and** fit the budget:
 
-| Gate | What it checks | Data |
+| Step | What it checks | Data |
 |---|---|---|
-| **A: catalyst** | Earnings on the as-of day or the target day, scheduled events in `config.toml [events]`, or a news-count spike | Alpha Vantage earnings calendar (free key) or `data/earnings.csv`; news is pluggable |
-| **B: move potential** | Share of the last 20 mornings where an ATM option would have gained 5% or more within 60 minutes of an opening-range break (min 40%), plus a weighted score of unusual options volume, IV rank and change, and momentum | IBKR bars and ticks. The move rate is an **underlying proxy** (delta × underlying move / option price) |
-| **C: fill quality** | Per strike and expiry, over the previous 1 to 5 sessions: morning and closing spread, first-hour and full-day volume, active minutes, OI and OI change, seconds between prints, displayed depth, and round-trip cost as a share of the +5% target | IBKR TRADES + BID_ASK 1-minute bars (**VERIFIED**). Bars only gives **PROXY** |
+| **A: catalyst** | Earnings on the as-of or target day, events in `config.toml [events]`, or a news spike. BMO/AMC is shown only if the source says so, otherwise "time unverified" plus an IV-crush warning | Alpha Vantage (free key) or `data/earnings.csv` |
+| **B: move potential** | Share of the last 20 mornings where an ATM option (Black-Scholes, 7 DTE, time decay each minute) would have hit **+5% before the -15% stop or the 10:30 ET time stop**, walking 1-minute bars forward (min 40%), plus unusual volume, IV rank/change and momentum | Underlying 1-minute bars (**MODEL ESTIMATE**). The old optimistic proxy is kept as `morning_option_move_proxy_legacy` for comparison only |
+| **C: fill quality** | Per strike and expiry over the last 1-5 sessions: morning/close spread, first-hour and day volume, active minutes, OI and OI change, seconds between prints, depth, round-trip cost vs the +5% target | Option 1-minute bars; quotes give **VERIFIED**, bars only give **PROXY** |
+| **Budget** | ASK in CAD incl. fees and FX must fit C$100, contract multiplier must be 100 | `sizing.py` |
 
-It picks the contract with delta 0.35 to 0.60, 2 to 21 DTE and $300 or less per contract. If that
-contract fails gate C, it tries nearby strikes and expiries and says so. The top 10 are ranked by
-combined score. Names that failed **only** gate C are listed separately as near-misses.
+Sizing (all in `config.toml [account]`):
+```
+usd_budget               = capital_cad * cad_usd_rate * (1 - fx_cost_pct/100)     # C$100 -> ~US$70.92 at 0.72
+max_premium_per_contract = (usd_budget - fee_per_contract_usd) / 100              # ~US$0.708 per share
+contracts                = floor(usd_budget / (ask*100 + fee))                     # must be >= 1
+```
+Anything that doesn't fit is rejected as **"unaffordable at C$100"**. The report shows, per
+candidate: contracts, entry cost USD and CAD, % of C$100, max loss CAD (full premium + fees), CAD
+lost at the -15% stop, breakeven at expiry, P/L at +5% and +10% after the exit fee and FX.
+`cad_usd_rate` is a fallback: the screen first tries the Bank of Canada Valet API (free, no key,
+cached daily, https://www.bankofcanada.ca/valet/docs). Max 3 actionable candidates are listed;
+take **one** of them at most (`max_open_positions = 1`, `max_new_trades_per_day = 1`).
+Debit spreads are shown in a separate **research-only** table: Wealthsimple has no multi-leg orders.
 
-**Plan per candidate:**
-- **Entry:** after the first 5 minutes, and only when the underlying breaks the opening-range high (calls) or low (puts) and the live spread is still within the gate C limit. A limit order at mid, cancelled after 60 s. Never a market order, never chasing.
-- **Target:** +5% (also showing +10%), exiting at or near the bid.
-- **Exit early on any of:** -15%, the underlying moving back inside the opening range, the spread widening past 2× its historical median, or the **10:30 ET time stop**.
+If nothing qualifies the report prints exactly:
+`NO TRADE — no verified opportunity meets the capital, liquidity, pricing, and defined-risk requirements.`
+Filters are never loosened to force a trade.
 
-**Backtest.** For each past session, the screen runs on an **as-of view fixed at the prior close**.
-Any read of a later date raises `LookaheadError`, and tests check this. Then the morning plan is
-simulated on 1-minute bars, deliberately pessimistically:
-- the limit only fills if a bar trades at or through it with volume of at least 10× our size;
-- even then we pay the ask and receive the bid, plus IBKR commissions;
-- within a bar, the stop is checked before the target.
-
-Validation:
-- a 70/30 time split (tuning on the first 70%, results reported on the last 30%);
-- a bootstrap of trade returns;
-- a 2× cost stress test and a 1-minute entry-delay test;
-- parameter perturbation;
-- splits by score, DTE, call vs put, earnings, and fill-quality bucket;
-- **with versus without gate C**, to show whether the fill-quality gate actually helps.
-
-## The PASS gate (exact)
-`reports/PASS.json` is written **only if all** of these hold. Otherwise any existing PASS file is deleted.
-1. Out-of-sample expectancy is above 0 USD per trade, after costs.
-2. The bootstrap 5th percentile of the mean out-of-sample net return is above 0.
-3. Expectancy at 2× costs is above 0.
-4. The out-of-sample entry fill rate is 70% or higher.
-5. There are at least 100 out-of-sample filled trades.
-6. **The data mode is VERIFIED**, meaning real historical option bars **with quotes**. PROXY,
-   BARS-ONLY and MOCK backtests can never PASS. This is stricter than the spec on purpose: a
-   proxy result must not unlock trading.
-
-Paper mode also checks that the PASS file's **config hash** matches `config.toml`. Changing any
-gate, plan, cost or backtest setting relocks paper mode until a new backtest passes.
+**Plan per candidate:** after 9:35 ET on a 5-minute opening-range break, BUY limit between mid and
+ask, never above the max debit, cancel after 60 s, at most 2 revisions; target +5%, stretch +10%,
+stop -15%; exit if the range is reclaimed or the spread blows out; time stop 10:30 ET.
+Each candidate also gets a Black-Scholes scenario line at 10:30 ET (underlying +1% / -1% / flat,
+IV +5 / -5 points), labelled MODEL ESTIMATE. Fields are tagged VERIFIED / MODEL ESTIMATE /
+ASSUMPTION / UNVERIFIED.
 
 ## Setup
 ```bash
 cd options_screener
-python3.11 -m venv .venv && .venv/bin/pip install -r requirements.txt    # Python 3.11+
-cp .env.example .env        # fill in locally; never commit it
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt     # Python 3.11+, no ib_async needed
+cp .env.example .env            # put MASSIVE_API_KEY=... here locally; never commit it
 cd .. && options_screener/.venv/bin/python -m options_screener.status
 ```
 
-**IB Gateway (or TWS), paper account:**
-1. Install IB Gateway and log in with your **paper trading username**. It's a separate login, shown in Client Portal under Settings, Paper Trading Account. Your paper account number starts with **DU**.
-2. Go to Configure, Settings, API, Settings and turn on socket clients. The port must be **4002** (Gateway paper) or **7497** (TWS paper). Live ports 4001 and 7496 are refused.
-3. The screen connects with `readonly=True`. For paper orders only, untick "Read-Only API" in the **paper** session.
-4. In `.env`, set `IBKR_PORT`, `IBKR_CLIENT_ID` and `IBKR_PAPER_ACCOUNT` (your DU number, used only by `paper.py`).
+Environment variables (all optional, all read from the environment or `.env`):
 
-**Market data subscriptions** (on your live IBKR account; shared with paper once you enable sharing in Client Portal):
+| Variable | Used for |
+|---|---|
+| `MASSIVE_API_KEY` | `--provider massive` (Massive free tier). Sent only in an `Authorization: Bearer` header |
+| `ALPHAVANTAGE_API_KEY` | Earnings calendar (no time of day, so earnings time shows as unverified) |
+| `HISTORICAL_OPTIONS_PROVIDER` | Backtests from your own data: `csv`, `massive` or `none` |
 
-| Subscription | Cost (IBKR's pricing page; check current) | Why |
-|---|---|---|
-| OPRA Top of Book (US options L1) | USD 1.50/month, non-pro | Option quotes, greeks, volume, OI |
-| US Securities Snapshot & Futures Value Bundle | USD 10/month, waived with USD 30+ commissions | Usually required alongside US data. Confirm with IBKR |
-
-Without these you get delayed data or errors. The screen keeps running and lists what was missing.
-
-**IBKR pacing** (`ratelimit.py`, from IBKR's historical data limitations page):
-- max 50 open requests;
-- no identical request within 15 s;
-- fewer than 6 requests per contract in 2 s;
-- 60 requests per 10 minutes for bars of **30 s or less**, with BID_ASK counting twice.
-
-For bars of 1 minute and up (all this screen uses), IBKR replaced the hard cap with a soft
-throttle. So the limiter keeps the per-request rules and applies `IBKR_SOFT_REQ_PER_10MIN`
-(default 300) instead of 60. Lower it if you see pacing errors.
-
-## Run
+## Morning commands (run from the repo root)
 ```bash
-python -m options_screener.screen --date next          # evening/weekend: next session (skips weekends + NYSE holidays)
-python -m options_screener.screen --date next --mock   # synthetic demo, no gateway needed
-python -m options_screener.backtest --start 2024-01-01 --end 2026-09-30 --underlying ibkr
-python -m options_screener.backtest --start 2026-03-01 --end 2026-09-30 --mock
-python -m options_screener.status                     # mode, providers, gate status
-python -m options_screener.paper --report options_screener/reports/screen_YYYYMMDD.md --paper   # needs PASS
+# evening before / early morning: screen the next session (skips weekends + NYSE holidays)
+options_screener/.venv/bin/python -m options_screener.screen --date next --provider massive
+# a specific day
+options_screener/.venv/bin/python -m options_screener.screen --date 2026-10-20 --provider massive
+# demo / plumbing check (NOT market data)
+options_screener/.venv/bin/python -m options_screener.screen --date 2026-10-20 --provider mock
+options_screener/.venv/bin/python -m options_screener.screen --date 2026-10-20 --provider synthetic
+# backtest with the single-position C$100 model
+options_screener/.venv/bin/python -m options_screener.backtest --start 2026-05-01 --end 2026-10-16 --provider mock
 ```
-Run these from the repo root. Reports go to `options_screener/reports/` (gitignored, except the sample).
-`--date next` resolves Friday evening, Saturday and Sunday to Monday, and skips NYSE holidays via `exchange_calendars`.
+Output: `options_screener/reports/morning_screen_YYYY-MM-DD.md` (+ `.json`), also printed.
+`--offline` skips the FX lookup. `data.provider` in `config.toml` sets the default provider.
 
-## Data sources and what costs money
+## Data providers and their limits
 
-| Source | Used for | Cost |
+| Provider | What it is | Banner |
 |---|---|---|
-| IBKR TWS API (paper) | Live screen: chains, quotes, greeks/IV, bars for **listed** options and underlyings | Free with an account; data subscriptions above |
-| Alpha Vantage `EARNINGS_CALENDAR` | Upcoming earnings (CSV, 3-month horizon) | Free API key. **No time of day**, so "after close / before open" can't be confirmed; the report says so |
-| `data/earnings.csv` | Historical earnings dates for backtests | Free (you supply it) |
-| **Massive (formerly Polygon)** options | **Backtests**: 1-minute bars of expired contracts (Options Basic and up, 2 years history); quotes for VERIFIED spreads need **Options Advanced** | **Paid**, check massive.com pricing. Set `HISTORICAL_OPTIONS_PROVIDER=massive`, `MASSIVE_API_KEY`, `MASSIVE_HAS_QUOTES=true` (only with Advanced) and `MASSIVE_RPM` |
-| CSV (`data/options/*.csv`) | Backtests from files you export | Free; see `data/README.md` |
-| ThetaData | Not implemented. Its endpoints weren't verified for this build, so the adapter refuses rather than guesses | |
+| `mock` | Deterministic synthetic market with synthetic quotes. Report format only | MOCK DATA |
+| `synthetic` | Mock underlying, options priced only by Black-Scholes (no quotes, no OI) | MOCK DATA |
+| `massive` | **Massive (formerly Polygon.io) FREE tier**, end-of-day data | DELAYED / END-OF-DAY DATA, with the real as-of date |
 
-Bars-only Massive (no quotes) gives a **BARS-ONLY** backtest. Fill quality is then PROXY, and the gate can't pass.
+**Massive free tier, verified from the official docs (Oct 2026):**
+- Stocks custom bars (daily + 1-minute, end-of-day): https://massive.com/docs/rest/stocks/aggregates/custom-bars
+- Options contracts reference (strike, expiry, type, `shares_per_contract`): https://massive.com/docs/rest/options/contracts/all-contracts
+- Options custom bars (1-minute aggregates with trade counts `n`): https://massive.com/docs/rest/options/aggregates/custom-bars
+- Previous-day bar: https://massive.com/docs/rest/options/aggregates/previous-day-bar
+- **Not on the free tier:** the option chain snapshot (OI, greeks, IV, quotes), https://massive.com/docs/rest/options/snapshots/option-chain-snapshot, and quotes (Options Advanced).
+- **Rate limit: 5 requests per minute**, counted separately for stocks, options and reference data: https://massive.com/knowledge-base/article/what-is-the-request-limit-for-massives-restful-apis
+
+What that means here (nothing the free tier lacks is invented):
+- **bid/ask:** none. The ask used for sizing is a **MODEL ESTIMATE** (EOD close + `proxy_spread_pct`/2). Affordability is DEGRADED and marked `*`.
+- **IV and delta:** **derived** by Black-Scholes from the option's end-of-day close.
+- **Open interest, displayed size, ticker option volume, IV history:** n/a (free tier). The OI, OI-collapse and depth checks show N/A and the unusual-volume / IV-rank signals are DEGRADED.
+- **First-hour option volume:** from the previous sessions' 1-minute bars (end-of-day history), never live.
+- Requests go through one 5/min limiter per bucket and a disk cache (`data/cache/massive`, past dates only). An HTTP 429 waits 60 s and retries once. The default universe is `[data] massive_symbols` (15 names) because of the limit. Expect a few minutes per run: about 2 stock calls per symbol, 1 reference call and up to 8 option calls per symbol that reaches gate C.
+
+## Backtest
+For each past session the screen runs on an as-of view fixed at the prior close (lookahead raises
+`LookaheadError`), then the morning plan is simulated on 1-minute bars: fills need volume at the
+limit, entries pay the ask, exits get the bid, the stop is checked before the target.
+The report has the original validation (70/30 split, bootstrap, 2x costs, 1-minute delay,
+perturbation, with vs without gate C) plus the **single-position C$100 model**: one trade per day,
+sized at the prior close's ask, exits per the plan; hit rates for +5% and +10% before the stop /
+time stop, CAD expectancy per trade, worst day, max drawdown on C$100, and the legacy vs new proxy
+comparison. **Mock and synthetic results are not evidence of a real edge.** The PASS gate needs
+VERIFIED (real historical quotes) data and can never pass on mock, synthetic or proxy data.
 
 ## Known limitations (read before trusting anything)
-- **IBKR has no data for expired options.** Real backtests need a paid historical source or your own CSVs. Without one, the backtest is an **underlying-proxy approximation**, gate C is **UNVERIFIED**, and the gate can't pass.
-- **Backtest chains are synthetic.** Strikes are on a grid, expiries are Fridays, and delta and price come from Black-Scholes. A generated contract may not have existed. Historical OI, depth and ticker-level option volume/IV aren't available, so those checks and signals are N/A and the score re-weights. Real history must come from the provider's bars for that exact OCC symbol, or the trade is "no data".
-- **IV crush.** Earnings candidates are flagged. Implied volatility usually collapses after the report, which can wipe out a correct directional move.
-- **Morning spreads are wide.** The first minutes after the open often have 2-3× normal spreads. The entry waits 5 minutes and re-checks the live spread.
-- **The round-trip gate is strict.** It allows a total cost of 40% of +5% = **2%**. With one contract, IBKR's USD 1.00 order minimum plus fees is about USD 2.10 round trip, so **options under about USD 1.05 can never pass**, even with no spread at all. In practice it favours liquid, tight names (SPY/QQQ, mega caps).
-- **The move-potential rate is a proxy** from underlying bars (ATM, 7 DTE, constant IV).
-- **The paper-account check** relies on paper accounts starting with **DU**. That's what Client Portal shows, but IBKR's API docs don't publish it as a rule, so it's enforced as a refusal. Confirm your account number.
-- `providers/ibkr.py`, `providers/massive.py` and the paper loop haven't been run against a live gateway or a paid key here. Tests use mocks. Verify them against your setup first (`status`, then a `--mock`-free screen on a weekend).
-- Massive authentication uses an `Authorization: Bearer` header. If your key is rejected, check Massive's auth docs.
+- **Data delay.** The free tier is end-of-day. Nothing here is a live quote. Check the live bid/ask in Wealthsimple before doing anything.
+- **One trade can lose the full C$100.** A long option can expire worthless; the stop is a plan, not a guarantee (gaps, wide spreads, no fill).
+- **IV crush.** After earnings, IV usually collapses and can wipe out a correct direction call.
+- **Cheap options have wide % spreads.** The options that fit C$100 (under ~US$0.71) often have a 1-cent tick that is 2-10% of the price, so they often fail the round-trip gate (2% total).
+- **FX eats small targets.** With the 1.5% buffer each way, a +5% option move nets only about +1.5% in CAD after fees, before the bid/ask spread; the report shows the exact CAD figure.
+- The Massive adapter is tested against recorded-format fixtures (`tests/fixtures/massive`, built from the documented response schema), not a live key.
+- `providers/ibkr.py` is kept but optional and unused; nothing imports it and `ib_async` is not a requirement.
 
 ## Files
-`screen.py` (gates A/B/C, ranking), `signals.py`, `fill_quality.py`, `plan.py`, `report.py`,
-`backtest.py`, `sim.py`, `stats.py`, `paper.py` (**only** order code), `status.py`, `ratelimit.py`,
-`market_calendar.py`, `pricing.py`, `providers/` (`ibkr`, `massive`, `csv_provider`, `catalysts`,
-`historical`, `synthetic`, `mock`, `base` with the as-of guard), `tests/`.
+`screen.py` (gates, budget, ranking), `sizing.py` (C$100 math), `fx.py` (Bank of Canada rate),
+`signals.py`, `fill_quality.py`, `plan.py`, `report.py`, `backtest.py`, `sim.py`, `stats.py`,
+`status.py`, `ratelimit.py`, `market_calendar.py`, `pricing.py`, `providers/` (`massive`, `mock`,
+`historical` incl. `synthetic_market`, `synthetic`, `csv_provider`, `catalysts`, `base` with the
+as-of guard, optional `ibkr`), `tests/`.
 
-Tests: `cd options_screener && .venv/bin/python -m pytest tests -q`. They are offline, with mocked APIs.
+Tests: `cd options_screener && .venv/bin/python -m pytest tests -q` (offline, mocked APIs).
+Lint: `.venv/bin/ruff check . --exclude .venv --select F,B,E9`.

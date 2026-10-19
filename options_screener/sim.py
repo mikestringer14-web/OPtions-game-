@@ -40,6 +40,8 @@ class Trade:
     minutes_to_fill: Optional[float] = None
     minutes_held: Optional[float] = None
     hit_target_mid: bool = False
+    hit_stretch_mid: bool = False     # +target2 (10%) reached before the stop / time stop (recorded, not traded)
+    contracts: int = 1
     pnl: float = 0.0
     net_ret: float = 0.0
     tags: dict = field(default_factory=dict)
@@ -72,16 +74,32 @@ def _mid(b: Bar, quotes: bool) -> float:
     return b.close
 
 
+def _reaches_stretch(opt: dict, m0: int, tstop: int, entry_mid: float, p: dict) -> bool:
+    """Bookkeeping only: would +target2 have printed before the stop or the time stop?"""
+    stretch = entry_mid * (1 + p.get("target2_pct", 10.0) / 100)
+    stop = entry_mid * (1 - p["stop_pct"] / 100)
+    for m in range(m0, tstop):
+        b = opt.get(m)
+        if b is None:
+            continue
+        if b.low <= stop:
+            return False
+        if b.high >= stretch:
+            return True
+    return False
+
+
 def simulate(*, day: date, contract: Contract, direction: str, option_bars: list[Bar], underlying_bars: list[Bar],
              cfg: dict, hist_median_spread_pct: Optional[float], quotes: bool, entry_delay_min: int = 0,
              cost_mult: float = 1.0, overrides: Optional[dict] = None, meta: Optional[dict] = None) -> Trade:
     p = {**cfg["plan"], **(overrides or {})}
     fq, costs = cfg["fill_quality"], cfg["costs"]
-    n = cfg["contract"]["contracts"]
     meta = meta or {}
+    n = meta.get("contracts") or cfg["contract"]["contracts"]
     tr = Trade(day=day, symbol=contract.symbol, contract=contract.label(), right=contract.right,
                dte=contract.dte(day), direction=direction, earnings=meta.get("earnings", False),
-               score=meta.get("score", 0.0), fq_score=meta.get("fq_score", 0.0), status="no_data", tags=meta.get("tags", {}))
+               score=meta.get("score", 0.0), fq_score=meta.get("fq_score", 0.0), status="no_data", tags=meta.get("tags", {}),
+               contracts=n)
     if not option_bars or not underlying_bars:
         return tr
     orng = opening_range(underlying_bars, p["entry_after_minutes"])
@@ -151,6 +169,7 @@ def simulate(*, day: date, contract: Contract, direction: str, option_bars: list
         if b.high >= target_mid and (b.volume or 0) >= fq["depth_multiple"] * n:
             tr.hit_target_mid = True
             exit_px, reason, exit_m = target_mid - half, "target", m
+            tr.hit_stretch_mid = _reaches_stretch(opt, m, tstop, limit, p)
             break
         u = und.get(m)
         if u and ((direction == "bull" and u.close < orh) or (direction == "bear" and u.close > orl)):
