@@ -1,0 +1,6 @@
+data/
+reports/
+paper/
+.venv/
+__pycache__/
+.pytest_cache/

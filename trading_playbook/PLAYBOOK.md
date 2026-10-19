@@ -1,5 +1,7 @@
 # $100 Trading Playbook (Mike + Grok Bot)
 
+> **Superseded for execution:** use `../trading_research/` instead. There, Python code handles signals and risk limits, and Grok only analyzes (`GROK_OPERATING_PROMPT.md`). The Pine scripts and the Part 1 background below still apply.
+
 Part 1 is for you. Part 2 is the block you paste into Grok Bot.
 
 ---

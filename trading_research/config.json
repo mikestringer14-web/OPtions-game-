@@ -1,0 +1,35 @@
+{
+  "_note": "Gates are fixed BEFORE testing. Changing them after seeing results defeats the point.",
+  "symbols": ["BTC-USD", "ETH-USD", "SOL-USD"],
+  "data_start": "2017-01-01",
+  "split": {"oos_start": "2023-01-01"},
+  "engine": {
+    "initial_equity": 100.0,
+    "risk_pct": 0.5,
+    "max_alloc_pct": 30.0,
+    "max_total_exposure_pct": 90.0,
+    "max_positions": 3,
+    "fee_rate": 0.006,
+    "slippage_rate": 0.001,
+    "min_notional": 1.0,
+    "entry_delay": 1,
+    "miss_rate": 0.0,
+    "seed": 7,
+    "halt_drawdown_pct": 25.0
+  },
+  "gates": {
+    "oos_trades_min": 30,
+    "oos_profit_factor_min": 1.2,
+    "max_drawdown_pct_max": 20.0,
+    "cost_15x_profit_factor_min": 1.05,
+    "perturbation_profitable_share_min": 0.7,
+    "symbols_profitable_min": 2,
+    "years_profitable_share_min": 0.5
+  },
+  "paper": {
+    "strategy": "A_trend_breakout",
+    "daily_loss_halt_pct": 3.0,
+    "max_data_age_hours": 30,
+    "max_consecutive_errors": 3
+  }
+}
