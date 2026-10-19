@@ -1,0 +1,22 @@
+# systemd USER service (alternative to run_listener.sh). WATCH-ONLY.
+# Install:
+#   mkdir -p ~/.config/systemd/user
+#   cp /workspace/trader/addons/graduation-listener.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now graduation-listener
+#   loginctl enable-linger "$USER"     # keep it running after you log out
+[Unit]
+Description=Pump.fun graduation listener (watch-only, no trading)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/workspace/trader/addons
+ExecStart=/workspace/trader/addons/.venv/bin/python /workspace/trader/addons/graduation_listener.py
+# Optional: put HELIUS_API_KEY=... in this file (chmod 600). It is only used as an RPC URL.
+EnvironmentFile=-/workspace/trader/addons/.env
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
