@@ -1,0 +1,5 @@
+snaptrade-python-sdk==13.0.40
+python-dotenv>=1.0
+requests>=2.31
+pytest>=8.0
+ruff>=0.6

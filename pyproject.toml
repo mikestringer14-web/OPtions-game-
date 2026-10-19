@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "snaptrade-watch"
+version = "0.1.0"
+description = "Watch-only / dry-run SnapTrade + Wealthsimple portfolio and order tool"
+requires-python = ">=3.9"
+dependencies = [
+  "snaptrade-python-sdk==13.0.40",
+  "python-dotenv>=1.0",
+  "requests>=2.31",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[project.scripts]
+snaptrade-watch = "snaptrade_watch.cli:main"
+
+[tool.setuptools]
+packages = ["snaptrade_watch"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 130
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
