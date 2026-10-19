@@ -1,0 +1,15 @@
+.venv/
+.env
+.env.*
+!.env.example
+logs/
+*.jsonl
+__pycache__/
+.pytest_cache/
+# generated reports and the PASS file are local results, not source
+reports/*
+!reports/.gitkeep
+!reports/sample_screen_MOCK.md
+data/*
+!data/.gitkeep
+!data/README.md

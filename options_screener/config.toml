@@ -1,0 +1,91 @@
+# Options morning screener configuration. RESEARCH + PAPER ONLY.
+# Every threshold the spec names lives here. Changing anything in [gates], [fill_quality],
+# [plan] or [backtest] changes the config hash and re-locks paper mode until a new PASS.
+
+[universe]
+# ~150 liquid optionable US names. Edit freely.
+symbols = [
+  "SPY","QQQ","IWM","DIA","XLF","XLE","XLK","XLV","XLY","XLI","XLP","XLU","XLB","SMH","ARKK","GLD","SLV","TLT","HYG","EEM",
+  "FXI","KRE","XBI","GDX","USO","UVXY","SOXL","TQQQ","SQQQ","TNA",
+  "AAPL","MSFT","NVDA","AMZN","GOOGL","GOOG","META","TSLA","AVGO","AMD","NFLX","ORCL","CRM","ADBE","INTC","QCOM","MU","TXN","AMAT","LRCX",
+  "KLAC","MRVL","ARM","SMCI","PLTR","SNOW","SHOP","UBER","ABNB","PYPL","SQ","COIN","MSTR","HOOD","RBLX","DKNG","ROKU","SNAP","PINS","SPOT",
+  "JPM","BAC","WFC","C","GS","MS","SCHW","V","MA","AXP",
+  "XOM","CVX","OXY","COP","SLB","HAL","DVN","MPC",
+  "UNH","LLY","JNJ","PFE","MRK","ABBV","BMY","AMGN","GILD","MRNA","CVS","HUM",
+  "WMT","COST","TGT","HD","LOW","NKE","SBUX","MCD","DIS","CMCSA",
+  "BA","CAT","DE","GE","LMT","RTX","UPS","FDX","F","GM",
+  "RIVN","LCID","NIO","BABA","JD","PDD","BIDU","TSM","ASML","SONY",
+  "T","VZ","TMUS","KO","PEP","PG","PM","MO","CCL","AAL",
+  "DAL","UAL","LUV","MARA","RIOT","SOFI","AFRM","UPST","CVNA","CHWY",
+]
+min_underlying_avg_volume = 2_000_000     # 20-day average shares/day
+max_premium_per_contract = 300.0          # USD (ask x 100) so 1 contract fits a $500 max
+
+[signals]
+# Weights for the combined score (sum does not need to be 1; scores are normalized by the
+# weights of the signals that could be computed). Each signal is scored 0..1.
+weight_catalyst = 0.25
+weight_unusual_volume = 0.20
+weight_iv = 0.10
+weight_momentum = 0.20
+weight_move_potential = 0.25
+news_spike_ratio = 3.0                    # news count vs 20d average counted as a catalyst
+move_lookback_sessions = 20               # mornings used for the move-potential rate
+move_target_pct = 5.0                     # option % move counted as a "good morning"
+proxy_dte_days = 7                        # DTE assumed when estimating option % from the underlying
+
+[gates]
+catalyst_min = 0.5                        # (A) catalyst score needed
+move_potential_min_rate = 0.40            # (B) share of mornings with a +5% option move
+move_signal_min = 0.45                    # (B) weighted score of the non-catalyst signals
+direction_min_strength = 0.10             # weaker directional bias than this = no trade
+
+[contract]
+delta_min = 0.35
+delta_max = 0.60
+dte_min = 2
+dte_max = 21
+allow_0dte = false
+contracts = 1                             # intended size used by the depth check
+top_n = 10
+
+[fill_quality]
+lookback_sessions = 3                     # previous 1-5 trading days
+max_morning_spread_pct = 5.0              # median 9:35-10:30 ET
+max_close_spread_pct = 8.0
+min_first_hour_volume = 500
+min_day_volume = 2000
+min_active_first_hour_minutes = 50        # of the 55 minutes 9:35-10:30
+min_open_interest = 1000
+max_oi_drop_pct = 30.0                    # OI "collapsing" day over day
+max_median_seconds_between_prints = 15.0
+depth_multiple = 10                       # displayed size >= 10x intended contracts
+max_round_trip_cost_share_of_target = 0.40
+proxy_spread_pct = 3.0                    # spread assumed when no quote data exists (PROXY)
+
+[plan]
+entry_after_minutes = 5                   # opening range = first 5 minutes
+entry_deadline = "10:15"                  # no new entries after this (ET)
+fill_timeout_seconds = 60
+target_pct = 5.0
+target2_pct = 10.0
+stop_pct = 15.0
+time_stop = "10:30"
+spread_widen_multiple = 2.0
+
+[costs]
+# IBKR Canada, US options, Tiered, <= 10,000 contracts/month, premium >= USD 0.10:
+# USD 0.65/contract, USD 1.00 minimum per order (interactivebrokers.ca/en/pricing/commissions-options.php).
+# Third-party fees per contract (OCC 0.025 + CAT 0.0003 + exchange/ORF estimate) ~= 0.05.
+commission_per_contract = 0.65
+min_commission_per_order = 1.00
+other_fees_per_contract = 0.05
+extra_slippage_pct = 0.0                  # added on top of the spread, per side
+
+[backtest]
+oos_fraction = 0.30
+min_oos_trades = 100
+min_entry_fill_rate = 0.70
+bootstrap_samples = 5000
+strike_step_low = 1.0                     # strike grid used to construct historical contracts
+strike_step_high = 5.0                    # used when the underlying is above 200
