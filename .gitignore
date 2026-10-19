@@ -1,0 +1,19 @@
+# secrets and local config: never commit
+.env
+.env.*
+!.env.example
+user_secret
+*user_secret*
+# logs and API responses (may contain account data)
+logs/
+*.jsonl
+*.log
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
