@@ -109,3 +109,36 @@ The confirmation screen shows what SnapTrade recommends you check: account, symb
 `pytest` (114 tests, no network). The SnapTrade client is mocked. `tests/test_sdk_contract.py` also runs the real SDK's request validation with HTTP stubbed out, so argument and type mistakes are caught.
 
 **Disclaimer:** this is a personal tool, not financial advice. Previews are estimates. You're responsible for anything you choose to place live.
+
+---
+
+## options_coach: Black-Scholes numbers for the Grok options coach
+
+Two parts, both standard-library Python (no installs needed):
+
+1. **`grok/GROK_SYSTEM_PROMPT.md`**: the instructions you paste into Grok. It makes Grok verify price, IV,
+   earnings, news and X sentiment before claiming anything; steer your trade ideas with a modified plan and the
+   reason in dollars instead of refusing; ask why you want a trade; and switch to fast mode with a protective
+   order when things are moving.
+2. **`options_coach/`**: a calculator that prints a numbers block to paste into Grok with your trade idea.
+
+```
+# one option: fair value, Greeks, prob ITM, expected move
+python -m options_coach.cli price --type C --spot 150 --strike 155 --dte 30 --iv 32
+
+# implied vol from a market price, compared with historical vol
+python -m options_coach.cli iv --type P --spot 150 --strike 140 --dte 30 --price 1.85 --hv 25
+
+# any multi-leg trade: max profit/loss, breakevens, prob of profit, position Greeks, what-if grid, flags
+python -m options_coach.cli strategy --symbol XYZ --spot 150 --dte 30 --account 5000 +1C150@4.10 -1C160@1.30
+
+# how many contracts fit your risk limit
+python -m options_coach.cli size --account 5000 --risk-per-contract 280 --max-risk-pct 5
+```
+
+Leg format: `+1C150@4.10` = buy 1 call, strike 150, at 4.10. `-2P140@1.10` = sell 2 puts. `+100S@148.50` = 100
+shares. Add `~45` to force a leg's IV to 45%. Leave off `@price` to have the model price the leg at `--iv`.
+`--rate` defaults to 4%; set it to the current 3-month T-bill yield. Prices are European-style Black-Scholes,
+so they slightly understate American options where early exercise matters.
+
+Tests: `python -m pytest tests/test_options_coach.py`
