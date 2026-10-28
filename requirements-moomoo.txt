@@ -1,0 +1,3 @@
+# Only for DATA_SOURCE=moomoo on your own computer (needs the OpenD gateway running and logged in).
+# Field names in screener.py were checked against this version.
+moomoo-api==10.11.7108

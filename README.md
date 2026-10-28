@@ -3,6 +3,96 @@ options trading simulator game
 
 ---
 
+## Options toolkit: screener, probability engine, Grok partner
+
+Three pieces, all read-only. Nothing here places a trade.
+
+| Piece | What it does |
+|---|---|
+| `screener.py` | Every weekday it checks your watchlist and sends one card per ticker to Telegram: technicals, volatility, events, liquidity, a suggested structure, and that structure's odds and expected value. |
+| `prob_engine.py` | The math. Prices options, finds breakevens, max profit and loss, probability of profit and expected value after fees, under two models (market IV and the stock's last 20 days). |
+| `GROK_INSTRUCTIONS.md` | The system prompt for your Grok bot, so it reviews trades with the same rules and math and adds live news and X checks. |
+
+### 1. One-time setup (cloud, free, runs on GitHub)
+
+1. Make your Telegram bot if you don't have one: message `@BotFather` in Telegram, send `/newbot`, copy the token. Then message your new bot once, open `https://api.telegram.org/bot<TOKEN>/getUpdates` in a browser and copy the `chat` `id` number.
+2. Optional: get a free Finnhub key at finnhub.io (adds the earnings calendar and fundamentals).
+3. On GitHub, open this repo > Settings > Secrets and variables > Actions.
+   - **Secrets** tab, add: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `FINNHUB_API_KEY` (optional).
+   - **Variables** tab, add: `WATCHLIST` (for example `NVDA,TSLA,AMD,META,PLTR`), `MAX_RISK_PER_TRADE` (dollars, for example `300`), `ACCOUNT_PROFILE` (`wealthsimple` or `moomoo`).
+   - Optional variables: `COMMISSION` (per contract, per side) and `FX_FEE_PCT` (0.015 = 1.5%) if your real fees differ from the defaults, and `RISK_FREE_RATE` (0.04 = 4%).
+4. Merge this branch into `main`. GitHub only runs scheduled jobs from the main branch.
+5. Test it now: repo > Actions > daily-screener > Run workflow. Cards arrive in Telegram in a few minutes.
+
+After that it runs by itself every weekday at 10:45 ET in summer, 9:45 ET in winter.
+
+### 2. Running it on your own computer (needed for Moomoo data)
+
+The cloud version uses free Yahoo data. Moomoo data is better (it comes from your broker), but Moomoo needs its OpenD program running and logged in on the same computer, which GitHub can't do.
+
+1. Install Python 3.10 or newer from python.org (Windows: tick "Add Python to PATH").
+2. Download this repo (green Code button > Download ZIP) and unzip it. Open a terminal in that folder.
+3. Run these once:
+   - Windows: `python -m venv .venv` then `.venv\Scripts\activate` then `pip install -r requirements.txt -r requirements-moomoo.txt`
+   - Mac: `python3 -m venv .venv` then `source .venv/bin/activate` then `pip install -r requirements.txt -r requirements-moomoo.txt`
+4. Copy `.env.example` to `.env` and fill in the screener section (Telegram, watchlist, max risk, `DATA_SOURCE=moomoo`).
+5. Download OpenD from Moomoo's OpenAPI page, open it, log in with your Moomoo account. Leave it running. Your account needs a US options quote right; if the screener says a snapshot failed with a permission message, that is the cause.
+6. Run it: `python screener.py`. Without Moomoo: `python screener.py --source yahoo`. Just a few tickers, no Telegram: `python screener.py --tickers NVDA,AMD --no-telegram`.
+7. Schedule it:
+   - Windows: Task Scheduler > Create Basic Task > Daily, weekdays, 10:15 AM > Start a program > browse to `scripts\run_screener_moomoo.bat`.
+   - Mac: run `crontab -e` and add `15 10 * * 1-5 /full/path/to/repo/scripts/run_screener_moomoo.sh` (your computer must be awake and OpenD logged in).
+
+### 3. Reading a screener card (illustrative numbers)
+
+```
+NVDA $182.40 | lean UP (+4)                       ticker, price, trend score (-5 to +5)
+>50MA >200MA | EMA 9>21>50 | RSI 61 | ATR 2.9% | RVol 1.3 | Gap +0.4%
+S/R 176.20 / 189.90                               nearest support / resistance
+IV30 48% | IVR 34 IVP 41 | HV20 41 HV60 45 | IV/HV 1.17
+Term Nov20 50 / Dec18 47 BACKWARDATION | Skew25 +3.1
+EM wk Oct30 +/-6.10 (3.3%) strad 4.90 | mo Nov20 +/-16.80 (9.2%)
+OI C 200(45.1k) 190(30.2k) 185(22.0k)             biggest open interest strikes (possible pins)
+OI P 170(38.0k) 175(21.5k) 160(19.9k)
+P/C vol 0.72 OI 0.85 | SI 1.1% DTC 0.9
+Events Earn Nov19 (22d) ! | ExDiv Dec04 (37d) !   ! = inside 45 days
+Fund RevG 70% EPSG 80% ROE 90% PE 45 ...          context only, never a timing signal
+Liq ATM A
+IDEA: bull call debit (IV rank 34, bull lean, IV not rich: debit spread)
+Nov20 +185C / -200C | debit $455 | legs liq A
+POP impl 37% / real 36% | EV impl $22 / real -$5
+Max +$1,021 / -$479 | BE 189.79
+P(50% of max) impl 45% / real 41%
+EV is near zero in at least one model ...
+>> MARGINAL: EV near zero under realized vol
+```
+
+- **IV30**: 30 day at-the-money implied volatility. **IVR / IVP**: IV rank and percentile. Free sources don't give IV history, so the toolkit saves one reading per day; it says `IVR building n/20d` until it has 20 days, and uses IV/HV in the meantime.
+- **Term**: front month vs next month ATM IV. **Skew25**: 25 delta put IV minus 25 delta call IV, in vol points.
+- **EM**: expected move to the weekly and monthly expiry (one standard deviation) with the straddle price as a cross check.
+- **POP impl / real**: probability of profit at expiry using option IV / using the last 20 days of actual movement. **EV**: average dollar result after fees, FX and slippage. When the two disagree, the card says so in words. That gap is the edge signal.
+- **Verdict**: ENTER CANDIDATE, MARGINAL, or THROW IT OUT. Liquidity F, max loss over your limit, or earnings inside the trade window is an automatic THROW IT OUT.
+- These are model estimates, not promises.
+
+### 4. Checking a specific trade before you place it
+
+1. Copy `examples/bull_call_example.json` to a new file, for example `mytrade.json`.
+2. Fill in the stock price (`spot`), the IV and 20 day HV, and one line per leg: `qty` 1 to buy or -1 to sell, `strike`, `dte` (days to expiry), `bid`, `ask`, `iv`, `oi`, `volume`. All of these are on the Moomoo option chain (see GROK_INSTRUCTIONS.md section A for where). If you already have a fill, add `"price": 4.55` to that leg.
+3. Run `python prob_engine.py mytrade.json --max-loss-limit 300` (use your max risk).
+4. You get the verdict, POP and EV under both models, max profit and loss, breakevens, the dominant Greek and the costs.
+
+### 5. Using Grok
+
+1. Open Grok > Customize (or a Grok Project's instructions) and paste the prompt from `GROK_INSTRUCTIONS.md` (between the two lines). Fill in your max risk and account size first. If Grok says it's too long for custom instructions, put it in a Project, or paste it as the first message of a chat.
+2. For each trade, paste the INPUT block from section A with your legs filled in. Easiest: paste the screener card, then add the legs you want, your thesis in one line, and ENTERING / HOLDING / ADJUSTING / EXITING. If you ran `prob_engine.py`, paste that output too; Grok will use those numbers.
+3. Read the card top to bottom: the VERDICT line first, then **Max loss** (is it inside your limit?), **Event risk** (anything inside the window you didn't plan for?), **What kills this trade**, and **Confidence**. Any `DATA MISSING` line tells you which Moomoo screen to check.
+4. For open positions, Grok compares hold vs close now vs the best adjustment, with POP, EV and max further loss for each.
+
+### 6. Tests
+
+`python -m pytest` runs everything offline. `tests/test_prob_engine.py` checks Black-Scholes against textbook values (S=100, K=100, T=1, r=5%, vol 20%: call 10.4506, put 5.5735, plus Hull's dividend example), put-call parity, the IV solver round trip, spreads, condors, calendars and the Monte Carlo. `tests/test_screener.py` runs the whole screener on synthetic data, including a fake Moomoo connection.
+
+---
+
 ## snaptrade_watch: SnapTrade + Wealthsimple, watch-only / dry-run
 
 A small Python tool that connects to **SnapTrade** with your own API key, links your
@@ -106,6 +196,6 @@ The confirmation screen shows what SnapTrade recommends you check: account, symb
 | "REFUSED (dry-run safety)" | Working as intended. See the safety model. |
 
 ### Tests
-`pytest` (114 tests, no network). The SnapTrade client is mocked. `tests/test_sdk_contract.py` also runs the real SDK's request validation with HTTP stubbed out, so argument and type mistakes are caught.
+`pytest` (114 snaptrade_watch tests, no network; the whole repo has 170). The SnapTrade client is mocked. `tests/test_sdk_contract.py` also runs the real SDK's request validation with HTTP stubbed out, so argument and type mistakes are caught.
 
 **Disclaimer:** this is a personal tool, not financial advice. Previews are estimates. You're responsible for anything you choose to place live.

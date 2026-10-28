@@ -1,0 +1,49 @@
+name: daily-screener
+
+# Read-only: pulls market data, sends a Telegram card per ticker. Never places orders.
+on:
+  schedule:
+    # 14:45 UTC on weekdays = 10:45 ET in summer (EDT) and 9:45 ET in winter (EST), after the open either way
+    - cron: "45 14 * * 1-5"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # only to commit data/iv_history.csv so IV rank can build up day by day
+
+concurrency:
+  group: daily-screener
+  cancel-in-progress: false
+
+jobs:
+  screen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Unit tests (no network)
+        run: python -m pytest -q tests/test_prob_engine.py tests/test_screener.py
+      - name: Run screener (Yahoo data)
+        env:
+          DATA_SOURCE: yahoo
+          WATCHLIST: ${{ vars.WATCHLIST }}
+          ACCOUNT_PROFILE: ${{ vars.ACCOUNT_PROFILE }}
+          MAX_RISK_PER_TRADE: ${{ vars.MAX_RISK_PER_TRADE }}
+          RISK_FREE_RATE: ${{ vars.RISK_FREE_RATE }}
+          COMMISSION: ${{ vars.COMMISSION }}
+          FX_FEE_PCT: ${{ vars.FX_FEE_PCT }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python screener.py
+      - name: Save IV history
+        run: |
+          [ -f data/iv_history.csv ] || exit 0
+          git config user.name "screener-bot"
+          git config user.email "screener-bot@users.noreply.github.com"
+          git add data/iv_history.csv
+          git diff --cached --quiet || (git commit -m "IV history $(date -u +%F)" && git push)

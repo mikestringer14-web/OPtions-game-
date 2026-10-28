@@ -1,0 +1,14 @@
+{
+  "spot": 182.40,
+  "iv": 0.48,
+  "hv20": 0.41,
+  "r": 0.04,
+  "commission_per_contract": 0.75,
+  "fx_fee_pct": 0.015,
+  "unplanned_event": false,
+  "event_in_window": false,
+  "legs": [
+    {"kind": "call", "qty": 1,  "strike": 185, "dte": 30, "bid": 7.10, "ask": 7.30, "iv": 0.48, "oi": 12000, "volume": 3400},
+    {"kind": "call", "qty": -1, "strike": 200, "dte": 30, "bid": 2.60, "ask": 2.72, "iv": 0.46, "oi": 9000,  "volume": 2100}
+  ]
+}
