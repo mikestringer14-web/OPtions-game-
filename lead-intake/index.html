@@ -20,7 +20,7 @@
     --hl: #fff4c2;
   }
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
       --bg: #0f141a;
       --card: #171d25;
       --ink: #e6ebf1;
@@ -33,7 +33,23 @@
       --warn: #f0a030;
       --bad: #ff6b6b;
       --hl: #3a3410;
+      color-scheme: dark;
     }
+  }
+  :root[data-theme="dark"] {
+      --bg: #0f141a;
+      --card: #171d25;
+      --ink: #e6ebf1;
+      --muted: #94a0b0;
+      --line: #2b3440;
+      --field: #1d242e;
+      --accent: #4c8dff;
+      --accent-ink: #0b1220;
+      --good: #3fb950;
+      --warn: #f0a030;
+      --bad: #ff6b6b;
+      --hl: #3a3410;
+      color-scheme: dark;
   }
   * { box-sizing: border-box; }
   body {
@@ -43,7 +59,7 @@
     font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
   }
   header {
-    position: sticky; top: 0; z-index: 20;
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
     background: var(--card);
     border-bottom: 1px solid var(--line);
     padding: 10px 16px;
@@ -256,7 +272,6 @@
     <div class="row" style="margin-top:10px">
       <button id="copyWriteup">Copy text</button>
       <button id="refreshWriteup" class="ghost">Refresh</button>
-      <button id="printWriteup" class="ghost">Print</button>
     </div>
   </div>
   <div class="card">
@@ -1024,7 +1039,7 @@ function listen() {
     rec.onerror = (ev) => {
       if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
         wantListen = false;
-        $("micStatus").textContent = "Microphone blocked. Allow mic access for this page in your browser settings, or type the answers.";
+        $("micStatus").textContent = "Microphone blocked here. Allow mic access in your browser settings, or open the GitHub Pages version. You can still type the answers.";
       } else if (ev.error === "no-speech") {
         $("micStatus").textContent = "Didn't hear anything. Listening again...";
       } else {
@@ -1045,6 +1060,13 @@ function stopListening() {
   if (rec) { try { rec.stop(); } catch (e) {} }
   listening = false; setMicUI();
   if (window.speechSynthesis) speechSynthesis.cancel();
+}
+
+/* ---------------- Two-tap confirm (no popups) ---------------- */
+function armConfirm(btn, label, action) {
+  if (btn.dataset.armed) { clearTimeout(btn._t); btn.textContent = btn.dataset.orig; delete btn.dataset.armed; action(); return; }
+  btn.dataset.orig = btn.textContent; btn.dataset.armed = "1"; btn.textContent = label;
+  btn._t = setTimeout(() => { btn.textContent = btn.dataset.orig; delete btn.dataset.armed; }, 3000);
 }
 
 /* ---------------- Saving ---------------- */
@@ -1080,7 +1102,7 @@ function renderSaved() {
     row.querySelector(".muted").textContent = [l.city, (l.phones && l.phones[0] || {}).number, l.booked && "Booked " + l.booked, "Saved " + when].filter(Boolean).join(" · ");
     row.querySelector('[data-a="open"]').onclick = () => { currentId = l.id; load(l); showTab("form"); };
     row.querySelector('[data-a="write"]').onclick = () => { currentId = l.id; load(l); showTab("writeup"); };
-    row.querySelector('[data-a="del"]').onclick = () => { if (confirm("Delete " + nm + "?")) { putSaved(getSaved().filter(x => x.id !== l.id)); if (currentId === l.id) currentId = null; renderSaved(); } };
+    row.querySelector('[data-a="del"]').onclick = (ev) => armConfirm(ev.currentTarget, "Tap again to delete", () => { putSaved(getSaved().filter(x => x.id !== l.id)); if (currentId === l.id) currentId = null; renderSaved(); });
     box.appendChild(row);
   });
 }
@@ -1132,9 +1154,8 @@ $("typedAnswer").addEventListener("keydown", e => {
 });
 $("saveLead").onclick = saveLead;
 $("toWriteup").onclick = () => showTab("writeup");
-$("newLead").onclick = () => { if (confirm("Clear the form and start a new lead?")) { currentId = null; load({}); stopInterview(); $("qText").textContent = "Tap \"Ask me the questions\" to start."; } };
+$("newLead").onclick = (ev) => armConfirm(ev.currentTarget, "Tap again to clear", () => { currentId = null; load({}); stopInterview(); $("qText").textContent = "Tap \"Ask me the questions\" to start."; });
 $("refreshWriteup").onclick = renderWriteup;
-$("printWriteup").onclick = () => { renderWriteup(); window.print(); };
 $("copyWriteup").onclick = () => {
   const text = renderWriteup().paragraphs.join("\n\n");
   const done = () => toast("Copied");
@@ -1157,6 +1178,8 @@ $("importBtn").onclick = () => {
   toast(n ? `Filled ${n} field(s). Check the Form tab for anything missed.` : "Couldn't find any field names in that text");
 };
 $("exportBtn").onclick = () => {
+  const json = JSON.stringify(getSaved(), null, 2);
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(json).then(() => toast("Backup copied. Paste it into a note or email to yourself."), () => {});
   const blob = new Blob([JSON.stringify(getSaved(), null, 2)], { type: "application/json" });
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
   a.download = "leads-" + new Date().toISOString().slice(0, 10) + ".json"; a.click();
