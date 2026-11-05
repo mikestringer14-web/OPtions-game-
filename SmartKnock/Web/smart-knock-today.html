@@ -1,0 +1,778 @@
+<title>Smart Knock</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one-column street tool. House-number plaque on top, outcome pad under the thumb, today's log below. */
+:root {
+  --bg: #111317;
+  --surface: #1b1e25;
+  --raised: #262b34;
+  --line: rgba(255,255,255,0.08);
+  --fg: #f4f6fa;
+  --muted: #9aa3b2;
+  --accent: #2e9bff;
+  --accent-soft: rgba(46,155,255,0.16);
+  --good: #22c55e;
+  --warn: #f5b83d;
+  --bad: #ef4444;
+  --o-booking: #16a34a;
+  --o-nosol: #dc2626;
+  --o-renter: #9333ea;
+  --o-prev: #ca8a04;
+  --o-referral: #0d9488;
+  --o-future: #2563eb;
+  --o-callback: #ea580c;
+  --o-noanswer: #475569;
+  --o-other: #64748b;
+  --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "Figtree", system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--fg); }
+body {
+  font-family: var(--body);
+  font-size: 15px;
+  padding-left: max(14px, env(safe-area-inset-left, 0px));
+  padding-right: max(14px, env(safe-area-inset-right, 0px));
+  padding-block: 10px 120px;
+  -webkit-tap-highlight-color: transparent;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; border: 0; background: none; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+
+header.top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.brand { font-family: var(--display); font-weight: 800; font-size: 22px; letter-spacing: 0.04em; text-transform: uppercase; }
+.brand span { color: var(--accent); }
+.sync { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+.dot.ok { background: var(--good); }
+
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.stat { background: var(--surface); border-radius: 12px; padding: 8px 10px; min-width: 0; }
+.stat b { display: block; font-family: var(--display); font-size: 26px; line-height: 1; font-variant-numeric: tabular-nums; }
+.stat small { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* House plaque */
+.plaque { background: var(--surface); border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.street-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.street-name { font-weight: 700; font-size: 16px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.street-name small { color: var(--muted); font-weight: 500; }
+.link-btn { color: var(--accent); font-weight: 600; font-size: 14px; padding: 6px 4px; white-space: nowrap; }
+.num-row { display: grid; grid-template-columns: 64px 1fr 64px; align-items: center; gap: 8px; }
+.nudge { height: 64px; border-radius: 14px; background: var(--raised); font-family: var(--display); font-size: 22px; font-weight: 700; }
+.house {
+  font-family: var(--display); font-weight: 800; font-size: 76px; line-height: 1;
+  text-align: center; font-variant-numeric: tabular-nums;
+  background: var(--fg); color: var(--bg); border-radius: 12px; padding: 6px 4px 2px;
+  border: 3px solid var(--accent);
+}
+.house-input { width: 100%; text-align: center; font-family: var(--display); font-weight: 800; font-size: 76px; line-height: 1; border-radius: 12px; border: 3px solid var(--accent); background: var(--fg); color: var(--bg); padding: 4px; }
+.step-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.seg { display: inline-flex; background: var(--raised); border-radius: 10px; padding: 3px; gap: 2px; }
+.seg button { padding: 6px 10px; border-radius: 8px; font-weight: 600; font-size: 13px; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.revisit { font-size: 13px; color: var(--warn); }
+
+/* Outcome pad */
+.pad { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.oc {
+  min-height: 62px; border-radius: 14px; color: #fff; display: flex; align-items: center; gap: 10px;
+  padding: 0 14px; font-family: var(--display); font-weight: 700; font-size: 21px; letter-spacing: 0.03em; text-transform: uppercase; text-align: left;
+  transition: transform .08s ease, filter .08s ease;
+}
+.oc:active { transform: scale(0.97); filter: brightness(0.9); }
+.oc.big { grid-column: 1 / -1; min-height: 84px; font-size: 30px; justify-content: center; }
+.oc svg { width: 22px; height: 22px; flex: none; }
+.oc.big svg { width: 30px; height: 30px; }
+
+.section-title { display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px; }
+.section-title h2 { font-family: var(--display); font-size: 20px; letter-spacing: 0.05em; text-transform: uppercase; margin: 0; }
+.list { display: flex; flex-direction: column; background: var(--surface); border-radius: 14px; overflow: hidden; }
+.row { display: grid; grid-template-columns: 10px 1fr auto; gap: 10px; align-items: center; padding: 11px 12px; border-top: 1px solid var(--line); text-align: left; width: 100%; }
+.row:first-child { border-top: 0; }
+.row .sw { width: 10px; height: 10px; border-radius: 50%; }
+.row .addr { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .meta { font-size: 12px; color: var(--muted); }
+.row .time { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+.empty { padding: 18px 14px; color: var(--muted); font-size: 14px; line-height: 1.45; }
+
+.bars { background: var(--surface); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.bar { display: grid; grid-template-columns: 110px 1fr 28px; gap: 8px; align-items: center; font-size: 13px; }
+.bar .track { height: 10px; background: var(--raised); border-radius: 5px; overflow: hidden; }
+.bar .fill { height: 100%; border-radius: 5px; }
+.bar .n { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btn { min-height: 48px; border-radius: 12px; background: var(--raised); font-weight: 600; padding: 0 12px; }
+.btn.primary { background: var(--accent); color: #fff; }
+.btn.danger { background: rgba(239,68,68,0.15); color: var(--bad); }
+.btn.full { grid-column: 1 / -1; }
+.note { font-size: 12px; color: var(--muted); line-height: 1.45; }
+
+/* Toast */
+.toast {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  padding: 0 max(14px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(14px, env(safe-area-inset-left, 0px));
+  pointer-events: none;
+}
+.toast-inner {
+  max-width: 560px; margin: 0 auto; background: var(--raised); border-radius: 14px; padding: 12px 14px;
+  display: flex; align-items: center; gap: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.45); pointer-events: auto;
+}
+.toast-inner .msg { flex: 1; min-width: 0; }
+.toast-inner .msg b { display: block; }
+.toast-inner .msg span { font-size: 12px; color: var(--muted); }
+.toast-inner button { color: var(--accent); font-weight: 700; padding: 8px 6px; }
+
+/* Sheets */
+.sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 40; display: flex; align-items: flex-end; justify-content: center; }
+.sheet {
+  background: var(--bg); width: 100%; max-width: 600px; max-height: 92vh; overflow-y: auto;
+  border-radius: 18px 18px 0 0; border-top: 1px solid var(--line);
+  padding: 14px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  display: flex; flex-direction: column; gap: 12px;
+}
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; position: sticky; top: -14px; background: var(--bg); padding: 4px 0; z-index: 1; }
+.sheet-head h3 { margin: 0; font-family: var(--display); font-size: 24px; letter-spacing: 0.04em; text-transform: uppercase; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+.field input, .field select, .field textarea { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; width: 100%; min-width: 0; font-size: 16px; }
+.field textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { padding: 8px 11px; border-radius: 999px; background: var(--raised); font-size: 13px; font-weight: 600; color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.summary { background: var(--surface); border-radius: 12px; padding: 12px; white-space: pre-wrap; font-size: 14px; line-height: 1.5; user-select: text; -webkit-user-select: text; }
+.missing { color: var(--warn); font-size: 13px; }
+.quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.oc-select { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.oc-select button { min-height: 44px; border-radius: 10px; font-size: 13px; font-weight: 700; color: #fff; opacity: 0.45; }
+.oc-select button[aria-pressed="true"] { opacity: 1; outline: 2px solid #fff; outline-offset: -2px; }
+.confirm { background: rgba(239,68,68,0.12); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+
+@media (max-width: 380px) {
+  .house, .house-input { font-size: 62px; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .bar { grid-template-columns: 92px 1fr 28px; }
+}
+@media (prefers-reduced-motion: reduce) { .oc { transition: none; } }
+</style>
+
+<div class="wrap" id="app">
+  <header class="top">
+    <div class="brand">Smart <span>Knock</span></div>
+    <div class="sync" id="sync"><span class="dot" id="syncDot"></span><span id="syncText">Connecting…</span></div>
+  </header>
+
+  <section class="stats" aria-label="Today">
+    <div class="stat"><b id="sDoors">0</b><small>Doors</small></div>
+    <div class="stat"><b id="sBook" style="color:var(--good)">0</b><small>Booked</small></div>
+    <div class="stat"><b id="sRate">0%</b><small>Book rate</small></div>
+    <div class="stat"><b id="sHour">0</b><small>Doors / hr</small></div>
+  </section>
+
+  <section class="plaque" aria-label="Current house">
+    <div class="street-line">
+      <div class="street-name" id="streetName">Set your street</div>
+      <button class="link-btn" id="changeStreet" type="button">Change street</button>
+    </div>
+    <div class="num-row">
+      <button class="nudge" id="numDown" type="button" aria-label="Previous house">−</button>
+      <div id="houseWrap"><div class="house" id="house" role="button" tabindex="0" aria-label="House number, tap to edit">–</div></div>
+      <button class="nudge" id="numUp" type="button" aria-label="Next house">+</button>
+    </div>
+    <div class="step-row">
+      <span>Next house after logging</span>
+      <div class="seg" role="group" aria-label="Number step">
+        <button type="button" data-step="-2" aria-pressed="false">−2</button>
+        <button type="button" data-step="2" aria-pressed="true">+2</button>
+        <button type="button" data-step="1" aria-pressed="false">+1</button>
+        <button type="button" data-step="0" aria-pressed="false">Stay</button>
+      </div>
+    </div>
+    <div class="revisit" id="revisit" hidden></div>
+  </section>
+
+  <section class="pad" id="pad" aria-label="Log outcome"></section>
+
+  <div class="section-title"><h2>Today</h2><span class="note" id="todayCount"></span></div>
+  <section class="list" id="list"></section>
+
+  <div class="section-title"><h2>Breakdown</h2></div>
+  <section class="bars" id="bars"></section>
+
+  <div class="section-title"><h2>Send it</h2></div>
+  <section class="actions">
+    <button class="btn primary" id="copySummary" type="button">Copy daily summary</button>
+    <button class="btn" id="downloadCsv" type="button">Download CSV</button>
+    <button class="btn" id="copyCsv" type="button">Copy CSV text</button>
+    <button class="btn" id="downloadAll" type="button">CSV of all days</button>
+  </section>
+  <p class="note">Tip: in any notes box, tap the microphone on the iPhone keyboard to dictate. Bookings build the three-paragraph lead summary automatically.</p>
+</div>
+
+<div class="toast" id="toast" hidden><div class="toast-inner"><div class="msg"><b id="toastTitle"></b><span id="toastSub"></span></div><button type="button" id="toastEdit">Edit</button><button type="button" id="toastUndo">Undo</button></div></div>
+<div id="sheetRoot"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- Outcomes ----------
+  const ICON = {
+    door: '<path d="M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17M3 21h18M14 12h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+    cal: '<path d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M9 15l2 2 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+    phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',
+    clock: '<circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 8v4l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+    people: '<circle cx="9" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 20a6 6 0 0 1 12 0M16 5a3 3 0 0 1 0 6M18 20a6 6 0 0 0-3-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+    star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',
+    key: '<circle cx="8" cy="14" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 11l8-8M16 6l2 2M14 8l2 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+    hand: '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6 6l12 12" stroke="currentColor" stroke-width="2"/>',
+    dots: '<circle cx="6" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="18" cy="12" r="1.8" fill="currentColor"/>'
+  };
+  const OUTCOMES = [
+    { id: "NO_ANSWER", title: "No Answer", color: "var(--o-noanswer)", icon: "door", contact: false },
+    { id: "BOOKING", title: "Booking", color: "var(--o-booking)", icon: "cal", contact: true },
+    { id: "CALL_BACK", title: "Call Back", color: "var(--o-callback)", icon: "phone", contact: true, follow: true },
+    { id: "FUTURE", title: "Future", color: "var(--o-future)", icon: "clock", contact: true, follow: true },
+    { id: "REFERRAL", title: "Referral", color: "var(--o-referral)", icon: "people", contact: true },
+    { id: "PREVIOUS_CUSTOMER", title: "Prev. Customer", color: "var(--o-prev)", icon: "star", contact: true },
+    { id: "RENTER", title: "Renter", color: "var(--o-renter)", icon: "key", contact: true },
+    { id: "NO_SOLICITING", title: "No Soliciting", color: "var(--o-nosol)", icon: "hand", contact: false },
+    { id: "OTHER", title: "Other", color: "var(--o-other)", icon: "dots", contact: true }
+  ];
+  const OC = Object.fromEntries(OUTCOMES.map(o => [o.id, o]));
+  const SERVICES = ["Roofing","Siding","Soffit","Fascia","Eavestroughs","Gutter Guards","Windows","Doors","Skylights","Bathrooms","Other"];
+  const svg = name => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[name]}</svg>`;
+
+  // ---------- Helpers ----------
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  const fmtTime = ts => new Date(ts).toLocaleTimeString("en-CA", { hour: "numeric", minute: "2-digit" });
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const lsGet = (k, fb) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch { return fb; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+  const addrOf = v => [v.number, v.street].filter(Boolean).join(" ") || "Address not set";
+  const fullAddr = v => [addrOf(v), v.city].filter(Boolean).join(", ");
+
+  async function copyText(text, okMsg) {
+    try { await navigator.clipboard.writeText(text); flash(okMsg || "Copied"); }
+    catch {
+      openSheet(`<div class="sheet-head"><h3>Copy this</h3><button class="link-btn" data-close type="button">Done</button></div>
+        <p class="note">Copying was blocked here. Press and hold the text, then Select All and Copy.</p>
+        <textarea class="summary" style="min-height:50vh;width:100%" readonly>${esc(text)}</textarea>`);
+    }
+  }
+
+  // ---------- State ----------
+  let db = null, downloads = null;
+  let visits = lsGet("sk.visits.today", []).filter(v => v.day === dayKey()); // local mirror for instant render
+  let street = lsGet("sk.street", { street: "", city: "Burlington", number: "", step: 2 });
+  let lastLog = null;
+
+  // ---------- Persistence ----------
+  function setSync(ok, text) { $("syncDot").classList.toggle("ok", ok); $("syncText").textContent = text; }
+
+  // ids written locally but not yet confirmed by the store, and ids deleted locally
+  const pending = new Set(visits.map(v => v.id));
+  const deleted = new Set();
+
+  async function saveVisit(v) {
+    pending.add(v.id);
+    upsertLocal(v);
+    if (!db) return;
+    try { await db.collection("visits").doc(v.id).set(v); pending.delete(v.id); }
+    catch (e) { setSync(false, "Saved on this phone only. Will retry."); }
+  }
+  async function removeVisit(id) {
+    deleted.add(id); pending.delete(id);
+    visits = visits.filter(v => v.id !== id); mirror(); render();
+    if (!db) return;
+    try { await db.collection("visits").doc(id).delete(); } catch {}
+  }
+  function retryPending() {
+    if (!db) return;
+    visits.filter(v => pending.has(v.id)).forEach(v =>
+      db.collection("visits").doc(v.id).set(v).then(() => pending.delete(v.id)).catch(() => {}));
+  }
+  function upsertLocal(v) {
+    const i = visits.findIndex(x => x.id === v.id);
+    if (i >= 0) visits[i] = v; else visits.push(v);
+    mirror(); render();
+  }
+  function mirror() { lsSet("sk.visits.today", visits); }
+  function saveStreet() {
+    lsSet("sk.street", street);
+    if (db) db.doc("settings/street").set(street).catch(() => {});
+  }
+
+  async function connect() {
+    if (!window.claude?.use) { setSync(false, "Saved on this phone only"); return; }
+    try { downloads = await window.claude.use("downloads"); } catch {}
+    try { db = await window.claude.use("db"); } catch { db = null; }
+    if (!db) { setSync(false, "Saved on this phone only"); return; }
+    const timer = setTimeout(() => setSync(false, "Slow connection, still saving locally"), 10000);
+    try {
+      const s = await db.doc("settings/street").get();
+      if (s.exists && !lsGet("sk.street", null)?.street) { street = { ...street, ...s.data() }; render(); }
+    } catch {}
+    retryPending();
+    db.collection("visits").where("day", "==", dayKey()).onSnapshot(snap => {
+      clearTimeout(timer);
+      const remote = snap.docs.map(d => d.data()).filter(v => !deleted.has(v.id));
+      const ids = new Set(remote.map(v => v.id));
+      remote.forEach(v => pending.delete(v.id));
+      visits = [...remote, ...visits.filter(v => pending.has(v.id) && !ids.has(v.id))];
+      mirror(); render();
+      setSync(pending.size === 0, pending.size === 0 ? "Saved" : `${pending.size} waiting to save`);
+    }, () => { clearTimeout(timer); setSync(false, "Saved on this phone only"); });
+  }
+
+  // ---------- Logging ----------
+  function log(outcomeId) {
+    if (!street.street) { openStreetSheet(); return; }
+    const v = {
+      id: newId(), day: dayKey(), ts: Date.now(),
+      number: String(street.number || "").trim(), street: street.street, city: street.city,
+      outcome: outcomeId, notes: "", followUp: "", lead: null
+    };
+    const prevNumber = street.number;
+    saveVisit(v);
+    advance();
+    lastLog = { id: v.id, prevNumber };
+    showToast(v);
+    if (navigator.vibrate) { try { navigator.vibrate(15); } catch {} }
+    if (outcomeId === "BOOKING") openLeadSheet(v.id);
+    else if (OC[outcomeId].follow) openFollowSheet(v.id);
+  }
+  function advance() {
+    const n = parseInt(street.number, 10);
+    if (!isNaN(n) && street.step) {
+      const next = n + Number(street.step);
+      if (next > 0) street.number = String(next);
+    }
+    saveStreet(); render();
+  }
+  function undo() {
+    if (!lastLog) return;
+    removeVisit(lastLog.id);
+    street.number = lastLog.prevNumber; saveStreet();
+    lastLog = null; hideToast(); render();
+  }
+
+  let toastTimer = null;
+  function showToast(v) {
+    $("toastTitle").textContent = `${OC[v.outcome].title} logged`;
+    $("toastSub").textContent = fullAddr(v);
+    $("toast").hidden = false;
+    $("toastEdit").onclick = () => { hideToast(); openEditSheet(v.id); };
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 6000);
+  }
+  function hideToast() { $("toast").hidden = true; }
+  function flash(msg) {
+    $("toastTitle").textContent = msg; $("toastSub").textContent = "";
+    $("toastEdit").hidden = true; $("toastUndo").hidden = true; $("toast").hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { hideToast(); $("toastEdit").hidden = false; $("toastUndo").hidden = false; }, 2200);
+  }
+
+  // ---------- Stats ----------
+  function stats(list) {
+    const counts = {}; OUTCOMES.forEach(o => counts[o.id] = 0);
+    list.forEach(v => counts[v.outcome] = (counts[v.outcome] || 0) + 1);
+    const doors = list.length, bookings = counts.BOOKING;
+    const contacts = list.filter(v => OC[v.outcome]?.contact).length;
+    const times = list.map(v => v.ts).sort((a, b) => a - b);
+    const hours = times.length > 1 ? (times[times.length - 1] - times[0]) / 3600000 : 0;
+    return { counts, doors, bookings, contacts,
+      rateDoor: doors ? bookings / doors : 0, rateContact: contacts ? bookings / contacts : 0,
+      perHour: hours >= 0.1 ? doors / hours : 0, start: times[0], end: times[times.length - 1] };
+  }
+
+  // ---------- Render ----------
+  function renderPad() {
+    $("pad").innerHTML = OUTCOMES.map((o, i) =>
+      `<button type="button" class="oc${i === 0 ? " big" : ""}" style="background:${o.color}" data-oc="${o.id}">${svg(o.icon)}<span>${o.title}</span></button>`).join("");
+  }
+
+  function render() {
+    const today = visits.filter(v => v.day === dayKey()).sort((a, b) => b.ts - a.ts);
+    const s = stats(today);
+    $("sDoors").textContent = s.doors;
+    $("sBook").textContent = s.bookings;
+    $("sRate").textContent = Math.round(s.rateDoor * 100) + "%";
+    $("sHour").textContent = s.perHour ? s.perHour.toFixed(0) : "–";
+
+    $("streetName").innerHTML = street.street
+      ? `${esc(street.street)} <small>${esc(street.city || "")}</small>`
+      : "Set your street to start";
+    if (!$("houseInput")) $("house").textContent = street.number || "–";
+    document.querySelectorAll(".seg button[data-step]").forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.step) === Number(street.step))));
+
+    const prior = today.find(v => v.number && v.number === String(street.number) && v.street === street.street);
+    const rv = $("revisit");
+    if (prior) { rv.hidden = false; rv.textContent = `Already logged today: ${OC[prior.outcome].title} at ${fmtTime(prior.ts)}. Logging again adds a second record.`; }
+    else rv.hidden = true;
+
+    $("todayCount").textContent = today.length ? `${today.length} logged` : "";
+    $("list").innerHTML = today.length ? today.map(v => `
+      <button type="button" class="row" data-edit="${v.id}">
+        <span class="sw" style="background:${OC[v.outcome]?.color}"></span>
+        <span style="min-width:0"><div class="addr">${esc(addrOf(v))}</div>
+          <div class="meta">${esc(OC[v.outcome]?.title)}${v.lead ? " · lead saved" : ""}${v.followUp ? " · follow up " + esc(v.followUp.replace("T", " ")) : ""}${v.notes ? " · " + esc(v.notes.slice(0, 40)) : ""}</div></span>
+        <span class="time">${fmtTime(v.ts)}</span>
+      </button>`).join("")
+      : `<div class="empty">Nothing logged yet today. Set your street, check the house number, and tap an outcome. The number moves to the next house on your side automatically.</div>`;
+
+    const max = Math.max(1, ...Object.values(s.counts));
+    $("bars").innerHTML = OUTCOMES.map(o => `
+      <div class="bar"><span>${o.title}</span><span class="track"><span class="fill" style="display:block;width:${(s.counts[o.id] / max) * 100}%;background:${o.color}"></span></span><span class="n">${s.counts[o.id]}</span></div>`).join("");
+  }
+
+  // ---------- Sheets ----------
+  function openSheet(html, onMount) {
+    const root = $("sheetRoot");
+    root.innerHTML = `<div class="sheet-bg" id="sheetBg"><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>`;
+    const bg = $("sheetBg");
+    bg.addEventListener("click", e => { if (e.target === bg || e.target.closest("[data-close]")) closeSheet(); });
+    if (onMount) onMount(bg.querySelector(".sheet"));
+  }
+  function closeSheet() { $("sheetRoot").innerHTML = ""; }
+
+  function openStreetSheet() {
+    openSheet(`
+      <div class="sheet-head"><h3>Street</h3><button class="link-btn" data-close type="button">Cancel</button></div>
+      <div class="field"><label for="fStreet">Street name</label><input id="fStreet" autocomplete="off" placeholder="Walkers Line" value="${esc(street.street)}"></div>
+      <div class="two">
+        <div class="field"><label for="fNum">First house number</label><input id="fNum" inputmode="numeric" placeholder="2145" value="${esc(street.number)}"></div>
+        <div class="field"><label for="fCity">City</label><input id="fCity" list="cities" value="${esc(street.city)}">
+          <datalist id="cities"><option>Burlington</option><option>Hamilton</option><option>Oakville</option><option>Ancaster</option><option>Stoney Creek</option><option>Waterdown</option><option>Grimsby</option><option>Milton</option></datalist></div>
+      </div>
+      <div class="field"><label>Walking direction</label>
+        <div class="seg" role="group" aria-label="Direction">
+          <button type="button" data-dir="2" aria-pressed="${street.step >= 0}">Numbers going up (+2)</button>
+          <button type="button" data-dir="-2" aria-pressed="${street.step < 0}">Going down (−2)</button>
+        </div></div>
+      <p class="note">Ontario streets put odd numbers on one side and even on the other, so +2 or −2 follows your side of the street. Use + and − on the main screen to skip a house.</p>
+      <button class="btn primary" id="saveStreet" type="button">Start this street</button>`, el => {
+      let dir = street.step < 0 ? -2 : 2;
+      el.querySelectorAll("[data-dir]").forEach(b => b.addEventListener("click", () => {
+        dir = Number(b.dataset.dir);
+        el.querySelectorAll("[data-dir]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+      }));
+      el.querySelector("#saveStreet").addEventListener("click", () => {
+        const name = el.querySelector("#fStreet").value.trim();
+        if (!name) { el.querySelector("#fStreet").focus(); return; }
+        street = { street: name, city: el.querySelector("#fCity").value.trim(), number: el.querySelector("#fNum").value.trim(), step: dir };
+        saveStreet(); closeSheet(); render();
+      });
+      if (!street.street) setTimeout(() => el.querySelector("#fStreet").focus(), 50);
+    });
+  }
+
+  function openFollowSheet(id) {
+    const v = visits.find(x => x.id === id); if (!v) return;
+    const def = new Date(Date.now() + (v.outcome === "FUTURE" ? 30 : 2) * 86400000);
+    def.setHours(17, 30, 0, 0);
+    const local = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    openSheet(`
+      <div class="sheet-head"><h3>${esc(OC[v.outcome].title)}</h3><button class="link-btn" data-close type="button">Skip</button></div>
+      <p class="note">${esc(fullAddr(v))}</p>
+      <div class="quick">${[["Tomorrow",1],["3 days",3],["1 week",7],["2 weeks",14],["3 months",90]].map(([t,d]) => `<button type="button" class="chip" data-days="${d}">${t}</button>`).join("")}</div>
+      <div class="field"><label for="fFollow">Follow up on</label><input id="fFollow" type="datetime-local" value="${v.followUp || local(def)}"></div>
+      <div class="field"><label for="fNote">Note (best time, who to ask for)</label><textarea id="fNote">${esc(v.notes)}</textarea></div>
+      <button class="btn primary" id="saveFollow" type="button">Save</button>`, el => {
+      el.querySelectorAll("[data-days]").forEach(b => b.addEventListener("click", () => {
+        const d = new Date(Date.now() + Number(b.dataset.days) * 86400000); d.setHours(17, 30, 0, 0);
+        el.querySelector("#fFollow").value = local(d);
+      }));
+      el.querySelector("#saveFollow").addEventListener("click", () => {
+        saveVisit({ ...v, followUp: el.querySelector("#fFollow").value, notes: el.querySelector("#fNote").value.trim() });
+        closeSheet();
+      });
+    });
+  }
+
+  function openEditSheet(id) {
+    const v = visits.find(x => x.id === id); if (!v) return;
+    let chosen = v.outcome;
+    openSheet(`
+      <div class="sheet-head"><h3>Edit door</h3><button class="link-btn" data-close type="button">Close</button></div>
+      <div class="two">
+        <div class="field"><label for="eNum">House number</label><input id="eNum" inputmode="numeric" value="${esc(v.number)}"></div>
+        <div class="field"><label for="eStreet">Street</label><input id="eStreet" value="${esc(v.street)}"></div>
+      </div>
+      <div class="field"><label>Outcome</label><div class="oc-select">${OUTCOMES.map(o => `<button type="button" data-pick="${o.id}" style="background:${o.color}" aria-pressed="${o.id === v.outcome}">${o.title}</button>`).join("")}</div></div>
+      <div class="field"><label for="eNotes">Notes</label><textarea id="eNotes">${esc(v.notes)}</textarea></div>
+      <div class="field"><label for="eFollow">Follow up (optional)</label><input id="eFollow" type="datetime-local" value="${esc(v.followUp)}"></div>
+      <div class="actions">
+        <button class="btn primary" id="eSave" type="button">Save changes</button>
+        <button class="btn" id="eLead" type="button">${v.lead ? "Edit lead" : "Add lead details"}</button>
+        ${v.lead ? `<button class="btn full" id="eCopyLead" type="button">Copy lead summary</button>` : ""}
+        <button class="btn danger full" id="eDelete" type="button">Delete this door</button>
+      </div>
+      <div id="eConfirm"></div>`, el => {
+      el.querySelectorAll("[data-pick]").forEach(b => b.addEventListener("click", () => {
+        chosen = b.dataset.pick;
+        el.querySelectorAll("[data-pick]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+      }));
+      const collect = () => ({ ...v, number: el.querySelector("#eNum").value.trim(), street: el.querySelector("#eStreet").value.trim(),
+        outcome: chosen, notes: el.querySelector("#eNotes").value.trim(), followUp: el.querySelector("#eFollow").value });
+      el.querySelector("#eSave").addEventListener("click", () => {
+        const nv = collect(); saveVisit(nv); closeSheet();
+        if (nv.outcome === "BOOKING" && !nv.lead) openLeadSheet(nv.id);
+      });
+      el.querySelector("#eLead").addEventListener("click", () => { saveVisit(collect()); openLeadSheet(v.id); });
+      el.querySelector("#eCopyLead")?.addEventListener("click", () => copyText(v.lead.summary, "Lead summary copied"));
+      el.querySelector("#eDelete").addEventListener("click", () => {
+        el.querySelector("#eConfirm").innerHTML = `<div class="confirm"><b>Delete ${esc(addrOf(v))}?</b><span class="note">This cannot be undone.</span>
+          <div class="actions"><button class="btn danger" id="eYes" type="button">Delete</button><button class="btn" id="eNo" type="button">Keep it</button></div></div>`;
+        el.querySelector("#eYes").addEventListener("click", () => { removeVisit(v.id); closeSheet(); });
+        el.querySelector("#eNo").addEventListener("click", () => { el.querySelector("#eConfirm").innerHTML = ""; });
+        el.querySelector("#eConfirm").scrollIntoView({ behavior: "smooth", block: "nearest" });
+      });
+    });
+  }
+
+  // ---------- Lead summary (only uses what was entered or said) ----------
+  const NP = "Not provided";
+  const PHONE_RE = /(?:\+?1[\s.\-]?)?\(?\b(\d{3})\)?[\s.\-]?(\d{3})[\s.\-]?(\d{4})\b/;
+  const EMAIL_RE = /[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/;
+  const NAME_TRIGGER = /\b(?:(?:his|her|their|the homeowner'?s?|owner'?s?) name is|name is|named|spoke (?:with|to)|talked (?:with|to)|homeowner is|met with)\s+/gi;
+  const NAME_STOP = new Set(["The","He","She","They","Him","Her","Them","Homeowner","Owner","A","An"]);
+  const SERVICE_WORDS = {
+    "Roofing": ["roof","roofing","shingle","shingles","reroof","re-roof"],
+    "Siding": ["siding","vinyl siding","cladding"],
+    "Soffit": ["soffit","soffits"], "Fascia": ["fascia"],
+    "Eavestroughs": ["eavestrough","eavestroughs","eaves trough","gutter","gutters","downspout","downspouts"],
+    "Gutter Guards": ["gutter guard","gutter guards","leaf guard","gutter cover","gutter covers"],
+    "Windows": ["window","windows"],
+    "Doors": ["new door","patio door","entry door","garage door","door replacement","replace the door","new doors","replace doors"],
+    "Skylights": ["skylight","skylights"], "Bathrooms": ["bathroom","bathrooms","shower","tub"]
+  };
+  const CONCERN = ["leak","leaking","leaks","missing","damage","damaged","curl","curling","granule","granules","rot","rotting","rotten","sag","sagging","moss","ice dam","draft","drafty","drafts","fog","foggy","fogged","condensation","years old","old","crack","cracked","peeling","faded","overflow","overflowing","clog","clogged","insurance","storm","wind","hail","mould","mold","water","stain","stains","worried","concern","concerned","wants","looking to","interested","quote","estimate","replace","replacement","repair","lifting","blown off"];
+  const word = (hay, w) => new RegExp("\\b" + w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i").test(hay);
+  const fmtPhone = raw => { let d = String(raw).replace(/\D/g, ""); if (d.length === 11 && d[0] === "1") d = d.slice(1); return d.length === 10 ? `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}` : raw; };
+  function findName(t) {
+    NAME_TRIGGER.lastIndex = 0; let m;
+    while ((m = NAME_TRIGGER.exec(t))) {
+      const rest = t.slice(m.index + m[0].length);
+      const n = rest.match(/^([A-Z][a-zA-Z'\-]+(?:\s+[A-Z][a-zA-Z'\-]+)?)/);
+      if (n && !NAME_STOP.has(n[1].split(/\s+/)[0])) return n[1];
+    }
+    return null;
+  }
+  function detectServices(t) {
+    let found = Object.keys(SERVICE_WORDS).filter(s => SERVICE_WORDS[s].some(w => word(t, w)));
+    if (found.includes("Gutter Guards") && found.includes("Eavestroughs")) {
+      const stripped = t.toLowerCase().replace(/gutter (guards?|covers?)/g, "");
+      if (!SERVICE_WORDS.Eavestroughs.some(w => word(stripped, w))) found = found.filter(s => s !== "Eavestroughs");
+    }
+    return found;
+  }
+  function sentences(t) {
+    return (t.match(/[^.!?\n]+[.!?]*/g) || []).map(s => s.trim()).filter(Boolean).map(s => /[.!?]$/.test(s) ? s : s + ".");
+  }
+  function extract(t) {
+    const f = { phone: null, email: null, name: null, services: [], concerns: [], job: [] };
+    if (!t || !t.trim()) return f;
+    const p = t.match(PHONE_RE); if (p) f.phone = fmtPhone(p[0]);
+    const e = t.match(EMAIL_RE); if (e) f.email = e[0];
+    f.name = findName(t);
+    f.services = detectServices(t);
+    for (const s of sentences(t)) {
+      const contactish = PHONE_RE.test(s) || EMAIL_RE.test(s) || !!findName(s);
+      const jobish = CONCERN.some(w => word(s, w)) || detectServices(s).length > 0;
+      if (contactish && !jobish) continue;
+      f.job.push(s);
+      if (CONCERN.some(w => word(s, w))) f.concerns.push(s);
+    }
+    return f;
+  }
+  function merged(L) {
+    const f = extract(L.transcript);
+    return { f, L: { ...L,
+      name: L.name || f.name || "", phone: L.phone || f.phone || "", email: L.email || f.email || "",
+      services: (L.services && L.services.length) ? L.services : f.services } };
+  }
+  function missingFields(raw) {
+    const { L } = merged(raw); const m = [];
+    if (!L.name) m.push("homeowner name"); if (!L.phone) m.push("phone");
+    if (!L.address) m.push("address"); if (!L.date) m.push("appointment date");
+    if (!L.time) m.push("appointment time"); if (!L.services.length) m.push("service");
+    return m;
+  }
+  function leadSummary(raw, bookedTs) {
+    const { f, L } = merged(raw);
+    const dateTxt = L.date ? new Date(L.date + "T12:00").toLocaleDateString("en-CA", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : NP;
+    const timeTxt = L.time ? new Date("2000-01-01T" + L.time).toLocaleTimeString("en-CA", { hour: "numeric", minute: "2-digit" }).replace(/\.$/, "") : NP;
+    const booked = new Date(bookedTs || Date.now()).toLocaleDateString("en-CA", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+    let p1 = `Contact Information: Homeowner: ${L.name || NP}. Phone: ${L.phone ? fmtPhone(L.phone) : NP}. Address: ${L.address || NP}.`;
+    if (L.email) p1 += ` Email: ${L.email}.`;
+    const svc = L.services.map(s => s === "Other" && L.otherService ? `Other (${L.otherService})` : s);
+    const reason = f.concerns[0] || sentences(L.details || "")[0];
+    const p2 = `Appointment Information: Booked ${booked}. Appointment date: ${dateTxt}. Appointment time: ${timeTxt}. Services requested: ${svc.length ? svc.join(", ") : NP}. Reason for consultation: ${reason ? reason.replace(/\.+$/, "") : NP}.`;
+    const parts = [];
+    const term = s => /[.!?]$/.test(s.trim()) ? s.trim() : s.trim() + ".";
+    if (L.details) parts.push(term(L.details));
+    const dl = (L.details || "").toLowerCase();
+    f.job.forEach(s => { if (!dl.includes(s.toLowerCase().replace(/\.+$/, ""))) parts.push(s); });
+    if (L.notes) parts.push("Notes: " + term(L.notes));
+    if (L.referral) parts.push("Referral source: " + term(L.referral));
+    if (L.followReq) parts.push("Follow-up required: " + term(L.followReq));
+    const p3 = "Detailed Job Information: " + (parts.length ? parts.join(" ") : NP + ".");
+    return [p1, p2, p3].join("\n\n");
+  }
+
+  function openLeadSheet(id) {
+    const v = visits.find(x => x.id === id); if (!v) return;
+    const L = v.lead?.input || { name: "", phone: "", email: "", address: fullAddr(v) + (v.city && !/ON\b/.test(fullAddr(v)) ? ", ON" : ""),
+      date: "", time: "", services: [], otherService: "", details: "", notes: "", referral: "", followReq: "", transcript: "" };
+    openSheet(`
+      <div class="sheet-head"><h3>Booking</h3><button class="link-btn" data-close type="button">Later</button></div>
+      <div class="field"><label for="lT">Conversation notes</label>
+        <textarea id="lT" placeholder="Tap the keyboard microphone and talk: who you spoke with, their number, the appointment, what's wrong with the house, objections.">${esc(L.transcript)}</textarea>
+        <span class="note">Blank fields below fill from these notes, but only with things you actually said.</span></div>
+      <div class="two">
+        <div class="field"><label for="lName">Homeowner name</label><input id="lName" autocomplete="off" value="${esc(L.name)}"></div>
+        <div class="field"><label for="lPhone">Phone</label><input id="lPhone" type="tel" value="${esc(L.phone)}"></div>
+      </div>
+      <div class="field"><label for="lAddr">Property address</label><input id="lAddr" value="${esc(L.address)}"></div>
+      <div class="field"><label for="lEmail">Email (optional)</label><input id="lEmail" type="email" autocapitalize="off" value="${esc(L.email)}"></div>
+      <div class="two">
+        <div class="field"><label for="lDate">Appointment date</label><input id="lDate" type="date" value="${esc(L.date)}"></div>
+        <div class="field"><label for="lTime">Time</label><input id="lTime" type="time" value="${esc(L.time)}"></div>
+      </div>
+      <div class="field"><label>Services</label><div class="chips" id="lSvc">${SERVICES.map(s => `<button type="button" class="chip" data-svc="${s}" aria-pressed="${L.services.includes(s)}">${s}</button>`).join("")}</div></div>
+      <div class="field" id="lOtherWrap" ${L.services.includes("Other") ? "" : "hidden"}><label for="lOther">Other service</label><input id="lOther" value="${esc(L.otherService)}"></div>
+      <div class="field"><label for="lDetails">Project details</label><textarea id="lDetails">${esc(L.details)}</textarea></div>
+      <div class="field"><label for="lNotes">Additional notes</label><textarea id="lNotes">${esc(L.notes)}</textarea></div>
+      <div class="two">
+        <div class="field"><label for="lRef">Referral source</label><input id="lRef" value="${esc(L.referral)}"></div>
+        <div class="field"><label for="lFollow">Follow-up needed</label><input id="lFollow" value="${esc(L.followReq)}"></div>
+      </div>
+      <div class="field"><label>Lead summary</label><div class="missing" id="lMissing"></div><div class="summary" id="lSummary"></div></div>
+      <div class="actions">
+        <button class="btn" id="lCopy" type="button">Copy summary</button>
+        <button class="btn primary" id="lSave" type="button">Save lead</button>
+      </div>`, el => {
+      let services = L.services.slice();
+      const read = () => ({
+        transcript: el.querySelector("#lT").value, name: el.querySelector("#lName").value.trim(), phone: el.querySelector("#lPhone").value.trim(),
+        address: el.querySelector("#lAddr").value.trim(), email: el.querySelector("#lEmail").value.trim(),
+        date: el.querySelector("#lDate").value, time: el.querySelector("#lTime").value, services: services.slice(),
+        otherService: el.querySelector("#lOther").value.trim(), details: el.querySelector("#lDetails").value.trim(),
+        notes: el.querySelector("#lNotes").value.trim(), referral: el.querySelector("#lRef").value.trim(), followReq: el.querySelector("#lFollow").value.trim()
+      });
+      const update = () => {
+        const input = read();
+        const miss = missingFields(input);
+        el.querySelector("#lMissing").textContent = miss.length ? "Missing: " + miss.join(", ") : "";
+        el.querySelector("#lSummary").textContent = leadSummary(input, v.ts);
+      };
+      el.querySelectorAll("[data-svc]").forEach(b => b.addEventListener("click", () => {
+        const s = b.dataset.svc;
+        services = services.includes(s) ? services.filter(x => x !== s) : [...services, s];
+        b.setAttribute("aria-pressed", String(services.includes(s)));
+        el.querySelector("#lOtherWrap").hidden = !services.includes("Other");
+        update();
+      }));
+      el.addEventListener("input", update);
+      el.querySelector("#lCopy").addEventListener("click", () => copyText(leadSummary(read(), v.ts), "Lead summary copied"));
+      el.querySelector("#lSave").addEventListener("click", () => {
+        const input = read();
+        const current = visits.find(x => x.id === id) || v;
+        saveVisit({ ...current, outcome: current.outcome, lead: { input, summary: leadSummary(input, v.ts), savedAt: Date.now() } });
+        closeSheet(); flash("Lead saved");
+      });
+      update();
+    });
+  }
+
+  // ---------- Exports ----------
+  const CSV_COLS = ["date","time","outcome","house_number","street","city","full_address","notes","follow_up","lead_name","lead_phone","lead_email","appointment_date","appointment_time","services","lead_summary"];
+  const csvCell = val => {
+    let s = String(val ?? "");
+    if (/^[=+\-@]/.test(s) && isNaN(Number(s))) s = "'" + s;
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  function toCsv(list) {
+    const rows = list.slice().sort((a, b) => a.ts - b.ts).map(v => {
+      const d = new Date(v.ts), li = v.lead?.input || {};
+      return [v.day, d.toTimeString().slice(0, 8), v.outcome, v.number, v.street, v.city, fullAddr(v), v.notes, (v.followUp || "").replace("T", " "),
+        li.name || "", li.phone || "", li.email || "", li.date || "", li.time || "", (li.services || []).join("; "), v.lead?.summary || ""].map(csvCell).join(",");
+    });
+    return [CSV_COLS.join(","), ...rows].join("\r\n") + "\r\n";
+  }
+  function dailySummary(list) {
+    const s = stats(list);
+    const d = new Date().toLocaleDateString("en-CA", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+    let out = `Canvassing summary, ${d}\n\nDoors knocked: ${s.doors}\nAnswered: ${s.contacts}\nBookings: ${s.bookings}\n`;
+    out += `Booking rate: ${(s.rateDoor * 100).toFixed(1)}% of doors, ${(s.rateContact * 100).toFixed(1)}% of answered doors\n`;
+    if (s.start) out += `First door ${fmtTime(s.start)}, last door ${fmtTime(s.end)}${s.perHour ? `, about ${s.perHour.toFixed(0)} doors per hour` : ""}\n`;
+    const streets = [...new Set(list.map(v => v.street).filter(Boolean))];
+    if (streets.length) out += `Streets: ${streets.join(", ")}\n`;
+    out += "\nBreakdown:\n" + OUTCOMES.filter(o => s.counts[o.id]).map(o => `  ${o.title}: ${s.counts[o.id]}`).join("\n") + "\n";
+    const bookings = list.filter(v => v.outcome === "BOOKING").sort((a, b) => a.ts - b.ts);
+    if (bookings.length) {
+      out += "\nBookings:\n";
+      bookings.forEach(b => { out += `\n- ${fullAddr(b)} (${fmtTime(b.ts)})\n`; if (b.lead?.summary) out += b.lead.summary + "\n"; });
+    }
+    const fu = list.filter(v => v.outcome === "CALL_BACK" || v.outcome === "FUTURE").sort((a, b) => a.ts - b.ts);
+    if (fu.length) out += "\nFollow-ups:\n" + fu.map(v => `- ${OC[v.outcome].title}: ${fullAddr(v)}${v.followUp ? " on " + v.followUp.replace("T", " ") : ""}${v.notes ? " (" + v.notes + ")" : ""}`).join("\n") + "\n";
+    const ns = list.filter(v => v.outcome === "NO_SOLICITING");
+    if (ns.length) out += "\nNo soliciting:\n" + ns.map(v => "- " + fullAddr(v)).join("\n") + "\n";
+    return out;
+  }
+  async function saveCsv(list, name) {
+    if (!list.length) { flash("Nothing to export yet"); return; }
+    const text = toCsv(list);
+    if (downloads) {
+      try { await downloads.save({ filename: name, data: new Blob([text], { type: "text/csv" }) }); return; }
+      catch (e) { if (e && e.code === "declined") return; }
+    }
+    copyText(text, "CSV copied. Paste it into Notes or an email.");
+  }
+  const todayList = () => visits.filter(v => v.day === dayKey());
+
+  // ---------- Events ----------
+  $("pad").addEventListener("click", e => { const b = e.target.closest("[data-oc]"); if (b) log(b.dataset.oc); });
+  $("list").addEventListener("click", e => { const b = e.target.closest("[data-edit]"); if (b) openEditSheet(b.dataset.edit); });
+  $("changeStreet").addEventListener("click", openStreetSheet);
+  $("streetName").addEventListener("click", openStreetSheet);
+  $("numUp").addEventListener("click", () => { const n = parseInt(street.number, 10); street.number = String(isNaN(n) ? 1 : n + (Math.abs(Number(street.step)) || 1) * (Number(street.step) < 0 ? -1 : 1)); saveStreet(); render(); });
+  $("numDown").addEventListener("click", () => { const n = parseInt(street.number, 10); const st = (Math.abs(Number(street.step)) || 1) * (Number(street.step) < 0 ? -1 : 1); if (!isNaN(n) && n - st > 0) { street.number = String(n - st); saveStreet(); render(); } });
+  document.querySelectorAll(".seg button[data-step]").forEach(b => b.addEventListener("click", () => { street.step = Number(b.dataset.step); saveStreet(); render(); }));
+  const editNumber = () => {
+    const wrap = $("houseWrap");
+    wrap.innerHTML = `<input class="house-input" id="houseInput" inputmode="numeric" value="${esc(street.number)}" aria-label="House number">`;
+    const inp = $("houseInput"); inp.focus(); inp.select();
+    const done = () => { street.number = inp.value.trim(); saveStreet(); wrap.innerHTML = `<div class="house" id="house" role="button" tabindex="0" aria-label="House number, tap to edit"></div>`; $("house").addEventListener("click", editNumber); render(); };
+    inp.addEventListener("blur", done);
+    inp.addEventListener("keydown", e => { if (e.key === "Enter") inp.blur(); });
+  };
+  $("house").addEventListener("click", editNumber);
+  $("house").addEventListener("keydown", e => { if (e.key === "Enter") editNumber(); });
+  $("toastUndo").addEventListener("click", undo);
+  $("copySummary").addEventListener("click", () => copyText(dailySummary(todayList()), "Daily summary copied"));
+  $("copyCsv").addEventListener("click", () => todayList().length ? copyText(toCsv(todayList()), "CSV copied") : flash("Nothing to export yet"));
+  $("downloadCsv").addEventListener("click", () => saveCsv(todayList(), `SmartKnock-${dayKey()}.csv`));
+  $("downloadAll").addEventListener("click", async () => {
+    let all = visits;
+    if (db) { try { all = (await db.collection("visits").get()).docs.map(d => d.data()); } catch {} }
+    saveCsv(all, `SmartKnock-all-${dayKey()}.csv`);
+  });
+
+  setInterval(retryPending, 20000);
+  renderPad();
+  render();
+  if (!street.street) setTimeout(openStreetSheet, 300);
+  connect();
+})();
+</script>
