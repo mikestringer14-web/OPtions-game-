@@ -1,0 +1,124 @@
+# Smart Knock Xcode project definition.
+# Generate the .xcodeproj with:  brew install xcodegen && xcodegen generate
+#
+# BEFORE BUILDING TO YOUR IPHONE, change the two values marked EDIT below.
+name: SmartKnock
+options:
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+
+settings:
+  base:
+    # EDIT 1: your Apple Developer Team ID (Xcode > Settings > Accounts), e.g. "AB12CD34EF".
+    DEVELOPMENT_TEAM: ""
+    # EDIT 2: a reverse-domain ID that is unique to you, e.g. com.mikestringer.smartknock
+    BASE_BUNDLE_ID: com.example.smartknock
+    APP_GROUP_ID: group.$(BASE_BUNDLE_ID)
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    SWIFT_EMIT_LOC_STRINGS: NO
+
+packages:
+  SmartKnockCore:
+    path: Packages/SmartKnockCore
+
+targets:
+  SmartKnock:
+    type: application
+    platform: iOS
+    sources:
+      - path: SmartKnock
+      - path: Shared
+    dependencies:
+      - package: SmartKnockCore
+      - target: SmartKnockWidgets
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(BASE_BUNDLE_ID)
+        PRODUCT_NAME: SmartKnock
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    entitlements:
+      path: SmartKnock/Resources/SmartKnock.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - $(APP_GROUP_ID)
+    info:
+      path: SmartKnock/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Smart Knock
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        SKAppGroupIdentifier: $(APP_GROUP_ID)
+        LSApplicationCategoryType: public.app-category.business
+        ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen: {}
+        UIApplicationSupportsMultipleScenes: false
+        UIRequiresFullScreen: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIUserInterfaceStyle: Dark
+        UIBackgroundModes:
+          - location
+        NSSupportsLiveActivities: true
+        NSLocationWhenInUseUsageDescription: Smart Knock uses your location during a canvassing session to detect when you stop at a door and to look up that home's address.
+        NSLocationAlwaysAndWhenInUseUsageDescription: Allowing Always lets Smart Knock resume an active canvassing session if iOS closes the app in the background. Location is only tracked while a session is running.
+        NSLocationTemporaryUsageDescriptionDictionary:
+          DoorDetection: Precise location is needed to tell neighbouring houses apart.
+        NSMotionUsageDescription: Smart Knock uses motion data to tell walking from driving, so stops at red lights are not counted as doors.
+        NSSpeechRecognitionUsageDescription: Speech recognition turns your spoken notes into text for the lead summary. It only runs when you tap Dictate.
+        NSMicrophoneUsageDescription: The microphone is used only while you dictate lead notes. No audio is saved.
+        CFBundleURLTypes:
+          - CFBundleURLName: $(BASE_BUNDLE_ID)
+            CFBundleURLSchemes:
+              - smartknock
+
+  SmartKnockWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: SmartKnockWidgets
+      - path: Shared
+    dependencies:
+      - package: SmartKnockCore
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+      - sdk: ActivityKit.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(BASE_BUNDLE_ID).widgets
+        PRODUCT_NAME: SmartKnockWidgets
+        SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+    entitlements:
+      path: SmartKnockWidgets/SmartKnockWidgets.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - $(APP_GROUP_ID)
+    info:
+      path: SmartKnockWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Smart Knock Widgets
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        SKAppGroupIdentifier: $(APP_GROUP_ID)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+
+schemes:
+  SmartKnock:
+    build:
+      targets:
+        SmartKnock: all
+        SmartKnockWidgets: all
+    run:
+      config: Debug
+    archive:
+      config: Release

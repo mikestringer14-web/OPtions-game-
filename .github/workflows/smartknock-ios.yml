@@ -1,0 +1,53 @@
+name: Smart Knock iOS
+
+on:
+  push:
+    paths:
+      - "SmartKnock/**"
+      - ".github/workflows/smartknock-ios.yml"
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Xcode
+        run: |
+          xcodebuild -version
+          xcrun simctl list runtimes | head -20
+
+      - name: Core logic unit tests
+        working-directory: SmartKnock/Packages/SmartKnockCore
+        run: swift test
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: SmartKnock
+        run: xcodegen generate
+
+      - name: Build app + widgets (simulator, unsigned)
+        working-directory: SmartKnock
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project SmartKnock.xcodeproj \
+            -scheme SmartKnock \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build 2>&1 | tee build.log | grep -E "error:|warning: .*(deprecated|will be an error)|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" build.log
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: SmartKnock/build.log
+          if-no-files-found: ignore
