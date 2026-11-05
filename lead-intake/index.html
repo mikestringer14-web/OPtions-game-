@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lead Intake Assistant</title>
+<style>
+  :root {
+    --bg: #f4f6f9;
+    --card: #ffffff;
+    --ink: #1c2430;
+    --muted: #5f6b7a;
+    --line: #d7dde5;
+    --field: #f8fafc;
+    --accent: #1f6feb;
+    --accent-ink: #ffffff;
+    --good: #1a7f37;
+    --warn: #b35900;
+    --bad: #c62828;
+    --hl: #fff4c2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f141a;
+      --card: #171d25;
+      --ink: #e6ebf1;
+      --muted: #94a0b0;
+      --line: #2b3440;
+      --field: #1d242e;
+      --accent: #4c8dff;
+      --accent-ink: #0b1220;
+      --good: #3fb950;
+      --warn: #f0a030;
+      --bad: #ff6b6b;
+      --hl: #3a3410;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  header {
+    position: sticky; top: 0; z-index: 20;
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+    padding: 10px 16px;
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
+  }
+  header h1 { font-size: 17px; margin: 0; }
+  .tabs { display: flex; gap: 6px; }
+  .tabs button { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  .tabs button.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  main { max-width: 980px; margin: 0 auto; padding: 16px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px; margin-bottom: 14px;
+  }
+  .card h2 { font-size: 15px; margin: 0 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .grid { display: grid; gap: 10px; grid-template-columns: repeat(12, 1fr); }
+  .c3 { grid-column: span 3; } .c4 { grid-column: span 4; } .c6 { grid-column: span 6; }
+  .c8 { grid-column: span 8; } .c12 { grid-column: span 12; } .c2 { grid-column: span 2; }
+  @media (max-width: 700px) {
+    .c2, .c3, .c4, .c6, .c8 { grid-column: span 12; }
+    .half-sm { grid-column: span 6 !important; }
+  }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+  input, select, textarea {
+    width: 100%; padding: 9px 10px; font: inherit; color: var(--ink);
+    background: var(--field); border: 1px solid var(--line); border-radius: 7px;
+  }
+  textarea { min-height: 90px; resize: vertical; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+  .flash { background: var(--hl) !important; transition: background .2s; }
+  button {
+    font: inherit; padding: 9px 14px; border-radius: 7px; cursor: pointer;
+    border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink);
+  }
+  button.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+  button.danger { background: transparent; color: var(--bad); border-color: var(--bad); }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .phone-row, .email-row { display: grid; gap: 8px; grid-template-columns: 2fr 1fr 1fr auto auto; align-items: end; margin-bottom: 8px; }
+  .email-row { grid-template-columns: 1fr auto auto; }
+  @media (max-width: 700px) {
+    .phone-row { grid-template-columns: 1fr 1fr; }
+  }
+  .radio { display: flex; align-items: center; gap: 5px; font-size: 13px; color: var(--muted); padding-bottom: 9px; white-space: nowrap; }
+  .radio input { width: auto; }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg button { background: transparent; color: var(--ink); border-color: var(--line); padding: 7px 12px; }
+  .seg button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  table.qa { width: 100%; border-collapse: collapse; }
+  table.qa td { border-bottom: 1px solid var(--line); padding: 8px 6px; vertical-align: middle; }
+  table.qa td:first-child { width: 38%; font-weight: 600; }
+  .inline { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .inline input { flex: 1; min-width: 120px; }
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
+    border: 1px solid var(--line); color: var(--muted);
+  }
+  .badge.booking { color: var(--good); border-color: var(--good); }
+  .badge.future { color: var(--warn); border-color: var(--warn); }
+  .badge.referral { color: var(--accent); border-color: var(--accent); }
+
+  /* Assistant panel */
+  .assist { border-color: var(--accent); }
+  .assist .q { font-size: 20px; font-weight: 700; margin: 6px 0; min-height: 28px; }
+  .assist .hint { color: var(--muted); font-size: 13px; min-height: 18px; }
+  .assist .heard { margin-top: 6px; padding: 8px 10px; background: var(--field); border-radius: 7px; min-height: 38px; font-style: italic; }
+  .mic {
+    width: 54px; height: 54px; border-radius: 50%; padding: 0; font-size: 22px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .mic.live { background: var(--bad); border-color: var(--bad); animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(198,40,40,.5); } 100% { box-shadow: 0 0 0 14px rgba(198,40,40,0); } }
+  .progress { height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 10px; }
+  .progress > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  .writeup p { margin: 0 0 14px; }
+  .writeup { white-space: normal; padding: 12px; background: var(--field); border-radius: 8px; border: 1px solid var(--line); }
+  .muted { color: var(--muted); font-size: 13px; }
+  .missing { color: var(--warn); font-size: 13px; }
+  .saved-item { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .hidden { display: none !important; }
+  .toast {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+    background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 14px;
+    opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 50;
+  }
+  .toast.show { opacity: 1; }
+  @media print {
+    header, .assist, .no-print { display: none !important; }
+    body { background: #fff; color: #000; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Lead Intake Assistant <span id="classBadge" class="badge">Unclassified</span></h1>
+  <div class="tabs">
+    <button data-tab="form" class="active">Form</button>
+    <button data-tab="writeup">Write-up</button>
+    <button data-tab="saved">Saved</button>
+  </div>
+</header>
+
+<main>
+<!-- ============ FORM TAB ============ -->
+<section id="tab-form">
+
+  <div class="card assist">
+    <h2>Assistant</h2>
+    <div class="row">
+      <button id="micBtn" class="mic" title="Start / stop listening">&#127908;</button>
+      <button id="startInterview">Ask me the questions</button>
+      <button id="freeDictate" class="ghost">Dictate freely</button>
+      <label class="radio" style="padding:0"><input type="checkbox" id="speakToggle" checked> Read questions aloud</label>
+      <label class="radio" style="padding:0"><input type="checkbox" id="onlyEmpty" checked> Skip filled fields</label>
+    </div>
+    <div class="q" id="qText">Tap "Ask me the questions" to start.</div>
+    <div class="hint" id="qHint">Say "skip", "back", "repeat" or "stop" any time. You can also type the answer below.</div>
+    <div class="heard" id="heard"></div>
+    <div class="row" style="margin-top:8px">
+      <input id="typedAnswer" placeholder="Type an answer and press Enter" style="flex:1;min-width:180px">
+      <button id="btnBack" class="ghost">Back</button>
+      <button id="btnSkip" class="ghost">Skip</button>
+      <button id="btnStop" class="ghost">Stop</button>
+    </div>
+    <div class="progress"><div id="progBar"></div></div>
+    <div class="muted" id="micStatus" style="margin-top:6px"></div>
+  </div>
+
+  <div class="card">
+    <h2>Lead Information</h2>
+    <div class="grid">
+      <div class="c6"><label>First Name*</label><input id="firstName"></div>
+      <div class="c6"><label>Last Name*</label><input id="lastName"></div>
+      <div class="c12"><label>Company Name</label><input id="company"></div>
+      <div class="c12"><label>Cross Reference</label><input id="crossRef"></div>
+      <div class="c4"><label>Job Category</label><input id="jobCategory" list="dlCategory"></div>
+      <div class="c4"><label>Work Type</label><input id="workType" list="dlWork"></div>
+      <div class="c4"><label>Trade Type</label><input id="tradeType" list="dlTrade"></div>
+      <div class="c12"><label>Lead Source*</label><input id="leadSource" list="dlSource"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Phone and Email</h2>
+    <div id="phones"></div>
+    <button class="ghost" id="addPhone">+ Add Another Phone</button>
+    <div style="height:12px"></div>
+    <div id="emails"></div>
+    <button class="ghost" id="addEmail">+ Add Another Email</button>
+  </div>
+
+  <div class="card">
+    <h2>Location Address</h2>
+    <div class="grid">
+      <div class="c8"><label>Street*</label><input id="street"></div>
+      <div class="c4"><label>Suite / Apt / Unit</label><input id="unit"></div>
+      <div class="c4"><label>City*</label><input id="city"></div>
+      <div class="c3 half-sm"><label>Province / State*</label><input id="province" list="dlProv"></div>
+      <div class="c2 half-sm"><label>Postal / Zip*</label><input id="postal"></div>
+      <div class="c3"><label>Country</label><input id="country" list="dlCountry" value="Canada"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Qualifying Questions</h2>
+    <table class="qa">
+      <tr><td>Age of Product</td><td><input id="ageProduct" placeholder="e.g. 15 years"></td></tr>
+      <tr><td>Are they the Homeowner?</td><td><div class="seg" data-field="homeowner" data-opts="Yes|No"></div></td></tr>
+      <tr><td>60-90 min Confirmed?</td><td><div class="seg" data-field="apptConfirmed" data-opts="Yes|No"></div></td></tr>
+      <tr><td>Job Minimum Quoted?</td><td><div class="inline"><div class="seg" data-field="jobMinQuoted" data-opts="Yes|No"></div><input id="jobMinAmount" placeholder="$ amount"></div></td></tr>
+      <tr><td>Spouse in the House?</td><td><div class="inline"><div class="seg" data-field="spouse" data-opts="Yes|No"></div><input id="spouseName" placeholder="Name"></div></td></tr>
+      <tr><td>Attic Access?</td><td><div class="seg" data-field="attic" data-opts="Yes|No|N/A"></div></td></tr>
+      <tr><td>Confirm Repair or Replace</td><td><div class="seg" data-field="repairReplace" data-opts="Repair|Replace"></div></td></tr>
+      <tr><td>Scope of Work</td><td><div class="seg" data-field="scope" data-opts="Full|Partial"></div></td></tr>
+      <tr><td>Timeline</td><td><input id="timeline" placeholder="e.g. ASAP, within 2 weeks, spring"></td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Booking and Classification</h2>
+    <div class="grid">
+      <div class="c6"><label>Booked (date and time)</label>
+        <div class="inline"><input id="booked" placeholder="e.g. Thursday Nov 12 at 10 AM"><input type="datetime-local" id="bookedPick" style="flex:0 0 auto;width:auto" title="Pick a date"></div>
+      </div>
+      <div class="c6"><label>Call Back</label>
+        <div class="inline"><input id="callBack" placeholder="e.g. Monday after 5 PM"><input type="datetime-local" id="callBackPick" style="flex:0 0 auto;width:auto" title="Pick a date"></div>
+      </div>
+      <div class="c12">
+        <label>Classification</label>
+        <div class="seg" data-field="classification" data-opts="Booking|Future|Referral"></div>
+        <div class="muted" id="classSuggest" style="margin-top:6px"></div>
+      </div>
+      <div class="c12"><label>Additional Notes (Motivation, Pain Points, etc.)</label><textarea id="notes"></textarea></div>
+    </div>
+  </div>
+
+  <div class="row no-print">
+    <button id="saveLead">Save lead</button>
+    <button id="toWriteup" class="ghost">Make write-up</button>
+    <button id="newLead" class="danger">New blank form</button>
+  </div>
+</section>
+
+<!-- ============ WRITE-UP TAB ============ -->
+<section id="tab-writeup" class="hidden">
+  <div class="card">
+    <h2>3 Paragraph Write-up</h2>
+    <div class="writeup" id="writeupOut"></div>
+    <div class="missing" id="writeupMissing" style="margin-top:8px"></div>
+    <div class="row" style="margin-top:10px">
+      <button id="copyWriteup">Copy text</button>
+      <button id="refreshWriteup" class="ghost">Refresh</button>
+      <button id="printWriteup" class="ghost">Print</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Turn a Filled Out Form Into a Write-up</h2>
+    <p class="muted">Paste the details from a form you already filled out (typed notes, a CRM copy, or "Field: value" lines). It fills the form and rebuilds the write-up. Example: <code>First Name: John / Last Name: Smith / Phone: 905 555 1234 cell / Street: 12 Main St / City: Burlington / Booked: Nov 12 10am / Replace / Full / Attic access yes</code></p>
+    <textarea id="importText" placeholder="Paste filled form details here"></textarea>
+    <div class="row" style="margin-top:8px">
+      <button id="importBtn">Fill form from this text</button>
+      <label class="radio" style="padding:0"><input type="checkbox" id="importReplace" checked> Clear current form first</label>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SAVED TAB ============ -->
+<section id="tab-saved" class="hidden">
+  <div class="card">
+    <h2>Saved Leads</h2>
+    <p class="muted">Saved in this browser only. Use Export to back them up or move them to another device.</p>
+    <div id="savedList"></div>
+    <div class="row" style="margin-top:10px">
+      <button id="exportBtn" class="ghost">Export all (JSON)</button>
+      <label class="ghost" style="display:inline-block;border:1px solid var(--line);border-radius:7px;padding:9px 14px;cursor:pointer;color:var(--ink);font-size:15px;margin:0">
+        Import JSON<input type="file" id="importFile" accept=".json,application/json" class="hidden">
+      </label>
+    </div>
+  </div>
+</section>
+</main>
+
+<datalist id="dlCategory"><option>Residential</option><option>Commercial</option></datalist>
+<datalist id="dlWork"><option>Repair</option><option>Replacement</option><option>New Install</option><option>Service / Maintenance</option><option>Inspection / Estimate</option></datalist>
+<datalist id="dlTrade"><option>HVAC</option><option>Furnace</option><option>Air Conditioning</option><option>Plumbing</option><option>Electrical</option><option>Roofing</option><option>Insulation</option><option>Windows and Doors</option><option>Water Heater</option><option>General Contracting</option></datalist>
+<datalist id="dlSource"><option>Google</option><option>Facebook</option><option>Website</option><option>Referral</option><option>Repeat Customer</option><option>Phone In</option><option>Mailer</option><option>Yard Sign</option><option>Home Show</option></datalist>
+<datalist id="dlProv"><option>ON</option><option>QC</option><option>BC</option><option>AB</option><option>MB</option><option>SK</option><option>NS</option><option>NB</option><option>NL</option><option>PE</option></datalist>
+<datalist id="dlCountry"><option>Canada</option><option>United States</option></datalist>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+"use strict";
+
+/* ---------------- Helpers ---------------- */
+const $ = (id) => document.getElementById(id);
+const TEXT_FIELDS = ["firstName","lastName","company","crossRef","jobCategory","workType","tradeType","leadSource",
+  "street","unit","city","province","postal","country","ageProduct","jobMinAmount","spouseName","timeline",
+  "booked","callBack","notes"];
+const SEG_FIELDS = ["homeowner","apptConfirmed","jobMinQuoted","spouse","attic","repairReplace","scope","classification"];
+const STORE_KEY = "leadIntake.saved.v1";
+const DRAFT_KEY = "leadIntake.draft.v1";
+
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("show"), 2200);
+}
+function flash(el) { if (!el) return; el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 900); }
+function titleCase(s) {
+  return String(s || "").trim().toLowerCase().replace(/\b([a-z])([a-z']*)/g, (m, a, b) => a.toUpperCase() + b)
+    .replace(/\bMc([a-z])/g, (m, a) => "Mc" + a.toUpperCase());
+}
+function cap(s) { s = String(s || "").trim(); return s ? s[0].toUpperCase() + s.slice(1) : s; }
+function clean(s) { return String(s || "").replace(/\s+/g, " ").trim().replace(/^[,.:;\-\s]+|[,;\-\s]+$/g, ""); }
+function safeGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function safeSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+/* ---------------- Normalizers ---------------- */
+const NUMWORDS = { zero:0, oh:0, o:0, one:1, two:2, to:2, too:2, three:3, four:4, for:4, five:5, six:6, seven:7, eight:8, ate:8, nine:9 };
+function phoneDigits(s) {
+  const words = String(s || "").toLowerCase().replace(/[()\-.,]/g, " ").split(/\s+/);
+  let out = "", rep = 1;
+  for (const w of words) {
+    if (w === "double") { rep = 2; continue; }
+    if (w === "triple") { rep = 3; continue; }
+    let d = null;
+    if (/^\d+$/.test(w)) d = w;
+    else if (w in NUMWORDS && !["to","too","for","o"].includes(w)) d = String(NUMWORDS[w]);
+    if (d !== null) { out += rep > 1 && d.length === 1 ? d.repeat(rep) : d; }
+    rep = 1;
+  }
+  return out;
+}
+function formatPhone(raw) {
+  let d = phoneDigits(raw);
+  if (d.length === 11 && d[0] === "1") d = d.slice(1);
+  if (d.length === 10) return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;
+  if (d.length === 7) return `${d.slice(0,3)}-${d.slice(3)}`;
+  return clean(raw);
+}
+function phoneTypeFrom(s) {
+  s = String(s || "").toLowerCase();
+  if (/\b(cell|cellular|mobile)\b/.test(s)) return "Cell";
+  if (/\b(home|house|landline)\b/.test(s)) return "Home";
+  if (/\b(work|office|business)\b/.test(s)) return "Work";
+  return "";
+}
+function extFrom(s) {
+  const m = String(s || "").toLowerCase().match(/\b(?:ext|extension|x)\.?\s*(\d{1,6})\b/);
+  return m ? m[1] : "";
+}
+function normEmail(s) {
+  let e = String(s || "").toLowerCase().trim();
+  e = e.replace(/\s+at\s+/g, "@").replace(/\s+dot\s+/g, ".").replace(/\s+(underscore)\s+/g, "_")
+       .replace(/\s+(dash|hyphen)\s+/g, "-").replace(/\s+/g, "");
+  e = e.replace(/@(gmail|hotmail|yahoo|outlook|icloud|rogers|cogeco|sympatico|bell)(com|ca|net)$/, "@$1.$2");
+  return e.replace(/[.,]$/, "");
+}
+function normPostal(s) {
+  const t = String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (/^[A-Z]\d[A-Z]\d[A-Z]\d$/.test(t)) return t.slice(0,3) + " " + t.slice(3);
+  if (/^\d{5}(\d{4})?$/.test(t)) return t;
+  return String(s || "").toUpperCase().trim();
+}
+const PROVS = { ontario:"ON", quebec:"QC", "british columbia":"BC", alberta:"AB", manitoba:"MB", saskatchewan:"SK",
+  "nova scotia":"NS", "new brunswick":"NB", newfoundland:"NL", "prince edward island":"PE", yukon:"YT", nunavut:"NU",
+  "northwest territories":"NT", "new york":"NY", michigan:"MI", ohio:"OH", florida:"FL", california:"CA", texas:"TX" };
+function normProv(s) {
+  const t = String(s || "").trim().toLowerCase().replace(/[.]/g, "");
+  if (PROVS[t]) return PROVS[t];
+  for (const k in PROVS) if (t.includes(k)) return PROVS[k];
+  if (/^[a-z]{2}$/.test(t)) return t.toUpperCase();
+  return titleCase(s);
+}
+function yesNo(s, allowNA) {
+  const t = " " + String(s || "").toLowerCase() + " ";
+  if (allowNA && /\b(n\/?a|not applicable|doesn't apply|does not apply|no attic|none)\b/.test(t) && !/\bno\b/.test(t.replace("no attic",""))) {
+    if (/no attic/.test(t)) return "No";
+    return "N/A";
+  }
+  if (allowNA && /\b(n\/?a|not applicable)\b/.test(t)) return "N/A";
+  if (/\b(no|nope|nah|not|negative|isn't|is not|aren't|are not|didn't|did not|don't|haven't|renting|renter|tenant)\b/.test(t)) return "No";
+  if (/\b(yes|yeah|yep|yup|sure|correct|confirmed|absolutely|they are|he is|she is|owner|owns|did|done|quoted|i did)\b/.test(t)) return "Yes";
+  return "";
+}
+function amountFrom(s) {
+  const t = String(s || "").toLowerCase().replace(/,/g, "");
+  const m = t.match(/\$?\s*(\d+(?:\.\d+)?)\s*(k|thousand|hundred)?/);
+  if (!m) return "";
+  let n = parseFloat(m[1]);
+  if (m[2] === "k" || m[2] === "thousand") n *= 1000;
+  if (m[2] === "hundred") n *= 100;
+  return "$" + n.toLocaleString("en-CA", { maximumFractionDigits: 2 });
+}
+function spouseNameFrom(s) {
+  let t = String(s || "");
+  const m = t.match(/\b(?:name is|named|called|name's|it's|his name|her name|their name)\s+(?:is\s+)?([A-Za-z][A-Za-z'\-]+(?:\s+[A-Za-z][A-Za-z'\-]+)?)/i);
+  if (m) return titleCase(m[1]);
+  t = t.replace(/\b(yes|yeah|yep|sure|correct|no|nope|spouse|wife|husband|partner|is|home|there|in the house|and|the|her|his)\b/gi, " ");
+  t = clean(t);
+  return t && t.split(" ").length <= 3 ? titleCase(t) : "";
+}
+function pickOption(s, opts) {
+  const t = String(s || "").toLowerCase();
+  for (const o of opts) {
+    const keys = [o.toLowerCase()].concat((OPTION_ALIASES[o] || []));
+    if (keys.some(k => t.includes(k))) return o;
+  }
+  return "";
+}
+const OPTION_ALIASES = {
+  "Repair": ["fix", "repair"],
+  "Replace": ["replace", "replacement", "new one", "brand new"],
+  "Full": ["full", "whole", "entire", "complete", "all of"],
+  "Partial": ["partial", "part of", "some of", "just the", "only the", "section"],
+  "Booking": ["book", "booked", "appointment set"],
+  "Future": ["future", "later", "call back", "callback", "follow up"],
+  "Referral": ["referral", "referred", "refer"]
+};
+function formatPick(v) {
+  if (!v) return "";
+  const d = new Date(v);
+  if (isNaN(d)) return v;
+  return d.toLocaleDateString("en-CA", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) +
+    " at " + d.toLocaleTimeString("en-CA", { hour: "numeric", minute: "2-digit" }).replace(/\./g, "").toUpperCase();
+}
+
+/* ---------------- Segmented controls ---------------- */
+const segState = {};
+document.querySelectorAll(".seg").forEach(seg => {
+  const field = seg.dataset.field;
+  seg.dataset.opts.split("|").forEach(opt => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = opt; b.dataset.val = opt;
+    b.addEventListener("click", () => { setSeg(field, segState[field] === opt ? "" : opt); onChange(); });
+    seg.appendChild(b);
+  });
+});
+function setSeg(field, val) {
+  segState[field] = val || "";
+  const seg = document.querySelector(`.seg[data-field="${field}"]`);
+  if (!seg) return;
+  seg.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.val === segState[field]));
+  if (val) flash(seg);
+}
+
+/* ---------------- Phones and emails ---------------- */
+function addPhoneRow(p) {
+  p = p || {};
+  const wrap = $("phones");
+  const idx = wrap.children.length;
+  const row = document.createElement("div");
+  row.className = "phone-row";
+  row.innerHTML = `
+    <div><label>Phone${idx === 0 ? "*" : ""}</label><input class="ph-num" placeholder="(905) 555-1234"></div>
+    <div><label>Ext</label><input class="ph-ext"></div>
+    <div><label>Type</label><select class="ph-type"><option value="">Choose</option><option>Cell</option><option>Home</option><option>Work</option></select></div>
+    <label class="radio"><input type="radio" name="phPrimary" class="ph-primary"> Primary</label>
+    <button type="button" class="ghost ph-del" title="Remove" style="margin-bottom:1px">&times;</button>`;
+  wrap.appendChild(row);
+  row.querySelector(".ph-num").value = p.number || "";
+  row.querySelector(".ph-ext").value = p.ext || "";
+  row.querySelector(".ph-type").value = p.type || "";
+  row.querySelector(".ph-primary").checked = !!p.primary || idx === 0;
+  row.querySelector(".ph-num").addEventListener("blur", e => { e.target.value = formatPhone(e.target.value); onChange(); });
+  row.querySelector(".ph-del").addEventListener("click", () => { if (wrap.children.length > 1) { row.remove(); onChange(); } });
+  row.querySelectorAll("input,select").forEach(el => el.addEventListener("input", onChange));
+  return row;
+}
+function addEmailRow(e) {
+  e = e || {};
+  const wrap = $("emails");
+  const idx = wrap.children.length;
+  const row = document.createElement("div");
+  row.className = "email-row";
+  row.innerHTML = `
+    <div><label>Email</label><input class="em-addr" type="email" placeholder="name@example.com"></div>
+    <label class="radio"><input type="radio" name="emPrimary" class="em-primary"> Primary</label>
+    <button type="button" class="ghost em-del" title="Remove" style="margin-bottom:1px">&times;</button>`;
+  wrap.appendChild(row);
+  row.querySelector(".em-addr").value = e.address || "";
+  row.querySelector(".em-primary").checked = !!e.primary || idx === 0;
+  row.querySelector(".em-del").addEventListener("click", () => { if (wrap.children.length > 1) { row.remove(); onChange(); } });
+  row.querySelectorAll("input").forEach(el => el.addEventListener("input", onChange));
+  return row;
+}
+function getPhones() {
+  return [...$("phones").children].map(r => ({
+    number: r.querySelector(".ph-num").value.trim(),
+    ext: r.querySelector(".ph-ext").value.trim(),
+    type: r.querySelector(".ph-type").value,
+    primary: r.querySelector(".ph-primary").checked
+  }));
+}
+function getEmails() {
+  return [...$("emails").children].map(r => ({
+    address: r.querySelector(".em-addr").value.trim(),
+    primary: r.querySelector(".em-primary").checked
+  }));
+}
+function firstEmptyPhoneRow() {
+  const rows = [...$("phones").children];
+  return rows.find(r => !r.querySelector(".ph-num").value.trim()) || addPhoneRow();
+}
+function firstEmptyEmailRow() {
+  const rows = [...$("emails").children];
+  return rows.find(r => !r.querySelector(".em-addr").value.trim()) || addEmailRow();
+}
+function setPhone(text, rowEl) {
+  const row = rowEl || firstEmptyPhoneRow();
+  const num = row.querySelector(".ph-num");
+  num.value = formatPhone(text.replace(/\b(?:ext|extension|x)\.?\s*\d+.*$/i, ""));
+  const ext = extFrom(text); if (ext) row.querySelector(".ph-ext").value = ext;
+  const type = phoneTypeFrom(text); if (type) row.querySelector(".ph-type").value = type;
+  flash(num);
+  return row;
+}
+function setEmail(text) {
+  const row = firstEmptyEmailRow();
+  const el = row.querySelector(".em-addr");
+  el.value = normEmail(text); flash(el);
+}
+
+/* ---------------- Data model ---------------- */
+function collect() {
+  const d = {};
+  TEXT_FIELDS.forEach(f => d[f] = $(f).value.trim());
+  SEG_FIELDS.forEach(f => d[f] = segState[f] || "");
+  d.phones = getPhones().filter(p => p.number);
+  d.emails = getEmails().filter(e => e.address);
+  return d;
+}
+function load(d) {
+  d = d || {};
+  TEXT_FIELDS.forEach(f => $(f).value = d[f] || (f === "country" ? "Canada" : ""));
+  SEG_FIELDS.forEach(f => setSeg(f, d[f] || ""));
+  $("phones").innerHTML = ""; $("emails").innerHTML = "";
+  (d.phones && d.phones.length ? d.phones : [{}]).forEach(addPhoneRow);
+  (d.emails && d.emails.length ? d.emails : [{}]).forEach(addEmailRow);
+  onChange();
+}
+function setField(f, val) {
+  if (SEG_FIELDS.includes(f)) { setSeg(f, val); return; }
+  const el = $(f); if (!el) return;
+  el.value = val; flash(el);
+}
+
+/* ---------------- Classification ---------------- */
+function suggestClass(d) {
+  if (d.booked) return "Booking";
+  if (/referr/i.test(d.leadSource) || /\brefer/i.test(d.notes)) return "Referral";
+  if (d.callBack || d.timeline) return "Future";
+  return "";
+}
+function currentClass(d) { return d.classification || suggestClass(d); }
+function updateBadge() {
+  const d = collect();
+  const s = suggestClass(d);
+  const c = currentClass(d);
+  const b = $("classBadge");
+  b.textContent = c || "Unclassified";
+  b.className = "badge" + (c ? " " + c.toLowerCase() : "");
+  $("classSuggest").textContent = d.classification
+    ? (s && s !== d.classification ? `Set by you. Based on the answers it looks like a ${s}.` : "Set by you.")
+    : (s ? `Suggested: ${s} (tap a button to lock it in).` : "Fill in Booked, Call Back or Lead Source and a suggestion will show here.");
+}
+
+/* ---------------- Write-up ---------------- */
+function joinList(arr) {
+  arr = arr.filter(Boolean);
+  if (arr.length <= 1) return arr.join("");
+  return arr.slice(0, -1).join(", ") + " and " + arr[arr.length - 1];
+}
+function article(word) { return /^[aeiou]/i.test(word) && !/^(uni|use)/i.test(word) ? "an" : "a"; }
+function ageText(a) {
+  if (!a) return "";
+  if (/^\d+(\.\d+)?$/.test(a.trim())) return a.trim() + (a.trim() === "1" ? " year" : " years");
+  return a.trim();
+}
+function sentence(s) { s = clean(s); if (!s) return ""; s = cap(s); return /[.!?]$/.test(s) ? s : s + "."; }
+
+function buildWriteup(d) {
+  const missing = [];
+  const name = clean([d.firstName, d.lastName].join(" ")) || "The customer";
+  if (!d.firstName) missing.push("first name");
+  if (!d.lastName) missing.push("last name");
+
+  /* Paragraph 1: who, where, how to reach them */
+  const p1 = [];
+  let intro = name + (d.company ? ` of ${d.company}` : "");
+  const addrParts = [];
+  if (d.street) addrParts.push(d.street + (d.unit ? `, ${/^(unit|suite|apt)/i.test(d.unit) ? d.unit : "Unit " + d.unit}` : ""));
+  if (d.city) addrParts.push(d.city);
+  const provPostal = clean([d.province, d.postal].join(" "));
+  if (provPostal) addrParts.push(provPostal);
+  if (d.country && !/^canada$/i.test(d.country)) addrParts.push(d.country);
+  if (addrParts.length) p1.push(`${intro} is located at ${addrParts.join(", ")}.`);
+  else { p1.push(`${intro} has not given a service address yet.`); missing.push("address"); }
+  if (!d.street && addrParts.length) missing.push("street");
+  if (!d.city && addrParts.length) missing.push("city");
+  if (!d.postal) missing.push("postal code");
+  if (!d.province) missing.push("province");
+
+  const phones = d.phones.slice().sort((a, b) => (b.primary ? 1 : 0) - (a.primary ? 1 : 0));
+  if (phones.length) {
+    const p = phones[0];
+    const typeWord = p.type === "Cell" ? "cellular" : p.type === "Home" ? "home" : p.type === "Work" ? "work" : "";
+    p1.push(`The best number to reach them is ${p.number}${p.ext ? " ext. " + p.ext : ""}${typeWord ? `, which is their ${typeWord} phone` : ""}.`);
+    if (!p.type) missing.push("phone type (cell or home)");
+    const others = phones.slice(1).map(o => `${o.number}${o.ext ? " ext. " + o.ext : ""}${o.type ? ` (${o.type === "Cell" ? "cellular" : o.type.toLowerCase()})` : ""}`);
+    if (others.length) p1.push(`They can also be reached at ${joinList(others)}.`);
+  } else { p1.push("No phone number was collected."); missing.push("phone number"); }
+  if (d.emails.length) {
+    const em = d.emails.slice().sort((a, b) => (b.primary ? 1 : 0) - (a.primary ? 1 : 0)).map(e => e.address);
+    p1.push(`Their email is ${joinList(em)}.`);
+  }
+  if (d.crossRef) p1.push(`Cross reference: ${d.crossRef}.`);
+
+  /* Paragraph 2: job type and when it is booked */
+  const p2 = [];
+  const cls = currentClass(d);
+  const jobWords = clean([d.jobCategory, d.tradeType, d.workType].filter(Boolean).join(" ").toLowerCase());
+  if (jobWords) p2.push(`This is ${article(jobWords)} ${jobWords} job${d.repairReplace && !/repair|replace/i.test(jobWords) ? ` where the customer is looking to ${d.repairReplace.toLowerCase()}` : ""}${d.scope ? ` with a ${d.scope.toLowerCase()} scope of work` : ""}.`);
+  else { p2.push(`The trade and work type have not been confirmed yet${d.repairReplace ? `, but the customer is looking to ${d.repairReplace.toLowerCase()}` : ""}.`); missing.push("trade / work type"); }
+  if (/^referral$/i.test(d.leadSource)) p2.push("The lead came in as a referral.");
+  else if (d.leadSource) p2.push(`The lead came in through ${/^(a|an|the)\b/i.test(d.leadSource) ? d.leadSource : d.leadSource.toLowerCase().replace(/\bgoogle\b/, "Google").replace(/\bfacebook\b/, "Facebook")}.`);
+  else missing.push("lead source");
+
+  if (cls === "Booking") {
+    if (d.booked) p2.push(`This lead is a booking and the appointment is set for ${d.booked}.`);
+    else { p2.push("This lead is marked as a booking but no appointment date was recorded."); missing.push("booked date"); }
+    if (d.apptConfirmed === "Yes") p2.push("The customer confirmed they have 60 to 90 minutes set aside for the appointment.");
+    else if (d.apptConfirmed === "No") p2.push("The 60 to 90 minute appointment length was not confirmed, so the consultant should confirm it before heading out.");
+    else missing.push("60-90 min confirmation");
+  } else if (cls === "Future") {
+    p2.push(`This is a future lead and is not booked yet${d.timeline ? `. They are looking at a timeline of ${d.timeline}` : ""}.`);
+    if (d.callBack) p2.push(`A call back is set for ${d.callBack}.`);
+    else missing.push("call back date");
+  } else if (cls === "Referral") {
+    p2.push(`This lead is classified as a referral${d.booked ? ` and the appointment is booked for ${d.booked}` : " and is not booked yet"}.`);
+    if (d.callBack) p2.push(`A call back is set for ${d.callBack}.`);
+  } else {
+    p2.push("This lead has not been classified as a booking, future or referral yet.");
+    missing.push("classification");
+  }
+
+  /* Paragraph 3: job details for the consultant */
+  const p3 = [];
+  if (d.repairReplace || d.ageProduct) {
+    let s = "The customer";
+    s += d.repairReplace ? ` wants to ${d.repairReplace.toLowerCase()} the existing product` : " has an existing product";
+    s += d.ageProduct ? `, which is about ${ageText(d.ageProduct)} old` : "";
+    s += d.scope ? `, and the scope of work is ${d.scope.toLowerCase()}` : "";
+    p3.push(s + ".");
+  } else if (d.scope) p3.push(`The scope of work is ${d.scope.toLowerCase()}.`);
+  if (!d.ageProduct) missing.push("age of product");
+  if (!d.repairReplace) missing.push("repair or replace");
+  if (!d.scope) missing.push("scope (full or partial)");
+
+  if (d.homeowner === "Yes") p3.push(`${d.firstName || "They"} ${d.firstName ? "is" : "are"} the homeowner.`);
+  else if (d.homeowner === "No") p3.push(`${d.firstName || "The customer"} is not the homeowner, so the consultant will need the owner's approval before anything is signed.`);
+  else missing.push("homeowner");
+
+  if (d.spouse === "Yes") p3.push(`There is a spouse in the house${d.spouseName ? `, ${d.spouseName},` : ""} and both decision makers should be present for the appointment.`);
+  else if (d.spouse === "No") p3.push("There is no spouse in the house, so the customer is the only decision maker.");
+  else missing.push("spouse in house");
+
+  if (d.attic === "Yes") p3.push("There is attic access.");
+  else if (d.attic === "No") p3.push("There is no attic access, which the consultant should plan for when looking at the job.");
+  else if (d.attic === "N/A") p3.push("Attic access does not apply to this job.");
+
+  if (d.jobMinQuoted === "Yes") p3.push(`The job minimum${d.jobMinAmount ? ` of ${d.jobMinAmount}` : ""} was quoted to the customer.`);
+  else if (d.jobMinQuoted === "No") p3.push(`The job minimum${d.jobMinAmount ? ` of ${d.jobMinAmount}` : ""} has not been quoted yet, so the consultant should go over it early.`);
+  else missing.push("job minimum quoted");
+
+  if (d.timeline && cls !== "Future") p3.push(`Their timeline is ${d.timeline}.`);
+  if (!d.timeline) missing.push("timeline");
+  if (d.notes) p3.push(sentence(`Additional notes: ${d.notes}`));
+
+  const flags = [];
+  if (d.homeowner === "No") flags.push("not the homeowner");
+  if (d.spouse === "Yes" && d.apptConfirmed !== "Yes") flags.push("make sure both decision makers can attend");
+  if (d.jobMinQuoted !== "Yes") flags.push("job minimum not quoted");
+  if (!d.ageProduct) flags.push("age of product unknown");
+  if (d.attic === "No") flags.push("no attic access");
+  if (flags.length) p3.push(`Before quoting, keep in mind: ${joinList(flags)}.`);
+  if (!p3.length) p3.push("No job details were collected yet.");
+
+  return { paragraphs: [p1.join(" "), p2.join(" "), p3.join(" ")], missing: [...new Set(missing)] };
+}
+function renderWriteup() {
+  const w = buildWriteup(collect());
+  $("writeupOut").innerHTML = w.paragraphs.map(p => `<p>${p.replace(/[&<>]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;" }[c]))}</p>`).join("");
+  $("writeupMissing").textContent = w.missing.length ? "Still missing: " + w.missing.join(", ") : "All fields covered.";
+  return w;
+}
+
+/* ---------------- Free text / dictation parser ---------------- */
+const KEYS = [
+  ["firstName", /\bfirst name\b/],
+  ["lastName", /\b(last name|surname|family name)\b/],
+  ["fullName", /\b(customer name|client name|full name)\b|(?<!(?:first|last|her|his|their|spouse's|wife's|husband's|partner's|company|business|family)\s*)\bname\b(?!\s+is\s+(?:a|the)\b)/],
+  ["company", /\b(company name|company|business name)\b/],
+  ["crossRef", /\b(cross reference|cross ref|reference number)\b/],
+  ["jobCategory", /\b(job category|category)\b/],
+  ["workType", /\b(work type|type of work)\b/],
+  ["tradeType", /\b(trade type|trade)\b/],
+  ["leadSource", /\b(lead source|source|heard about us from|found us on|found us through)\b/],
+  ["ext", /\b(extension|ext)\b/],
+  ["phone", /\b(cell phone|cellphone|cell number|cell|mobile|home phone|home number|work phone|phone number|phone|number)\b/],
+  ["email", /\b(email address|e-mail|email)\b/],
+  ["unit", /\b(suite|apartment|apt|unit)\b/],
+  ["street", /\b(street address|address)\b|^\s*street\b|\bstreet(?=\s*:)/m],
+  ["city", /\b(city|town)\b/],
+  ["province", /\b(province|state)\b/],
+  ["postal", /\b(postal code|postal|zip code|zip)\b/],
+  ["country", /\bcountry\b/],
+  ["ageProduct", /\b(age of (the )?product|age of (the )?unit|product age|age|years old)\b/],
+  ["homeowner", /\b(homeowner|home owner|owns the home|own the home)\b/],
+  ["apptConfirmed", /\b(60 to 90|60-90|sixty to ninety|90 minutes|appointment confirmed|confirmed)\b/],
+  ["jobMin", /\b(job minimum|job min|minimum)\b/],
+  ["spouse", /\b(spouse|wife|husband|partner)\b/],
+  ["attic", /\b(attic access|attic)\b/],
+  ["repairReplace", /(?<!(?:work type|type of work)[:\s\-]*)\b(repair or replace|repair|replacement|replace)\b/],
+  ["scope", /\b(scope of work|scope)\b/],
+  ["timeline", /\b(timeline|time frame|timeframe)\b/],
+  ["booked", /\b(booked for|booked|appointment is|appointment)\b/],
+  ["callBack", /\b(call back|callback|call them back)\b/],
+  ["classification", /\b(classification|classify as|classified as|this is a)\b/],
+  ["notes", /\b(additional notes|notes|note|pain points|pain point|motivation)\b/]
+];
+function parseFreeText(text) {
+  const src = String(text || "").replace(/\r/g, "");
+  const lower = src.toLowerCase();
+  // find every keyword occurrence
+  const hits = [];
+  KEYS.forEach(([field, re]) => {
+    const g = new RegExp(re.source, "g");
+    let m;
+    while ((m = g.exec(lower))) hits.push({ field, start: m.index, end: m.index + m[0].length, word: m[0] });
+  });
+  hits.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+  // drop overlapping hits (keep the longest earliest)
+  const kept = [];
+  let lastEnd = -1;
+  for (const h of hits) { if (h.start >= lastEnd) { kept.push(h); lastEnd = h.end; } }
+  // once we hit "notes", everything after is notes
+  const ni = kept.findIndex(h => h.field === "notes");
+  const use = ni >= 0 ? kept.slice(0, ni + 1) : kept;
+  const out = [];
+  use.forEach((h, i) => {
+    const end = i + 1 < use.length ? use[i + 1].start : src.length;
+    let val = src.slice(h.end, end).replace(/^\s*(is|are|was|=|:|-|of|to)\s+/i, " ").replace(/^[\s:=\-]+/, "");
+    val = val.replace(/[\n\/|]+/g, " ").replace(/\s+(and|also|then)\s*$/i, "").trim().replace(/[,;.]+$/, "");
+    out.push({ field: h.field, word: h.word, value: val });
+  });
+  return out;
+}
+function applyParsed(items) {
+  let count = 0;
+  for (const { field, word, value } of items) {
+    const v = value;
+    switch (field) {
+      case "fullName": {
+        const parts = clean(v).split(" ");
+        if (parts[0]) { setField("firstName", titleCase(parts[0])); count++; }
+        if (parts.length > 1) setField("lastName", titleCase(parts.slice(1, 3).join(" ")));
+        break;
+      }
+      case "firstName": case "lastName": if (v) { setField(field, titleCase(v.split(" ").slice(0, 2).join(" "))); count++; } break;
+      case "company": case "crossRef": case "timeline": case "notes":
+        if (v) { setField(field, field === "notes" ? cap(v) : v); count++; } break;
+      case "city": if (v) { setField("city", titleCase(v)); count++; } break;
+      case "street": if (v) { setField("street", titleCase(v).replace(/\b(St|Rd|Ave|Dr|Blvd|Cres|Ct|Pl)\b\.?/g, "$1")); count++; } break;
+      case "unit": if (v) { setField("unit", v.toUpperCase().replace(/^(NUMBER|#)\s*/, "")); count++; } break;
+      case "province": if (v) { setField("province", normProv(v)); count++; } break;
+      case "postal": if (v) { setField("postal", normPostal(v)); count++; } break;
+      case "country": if (v) { setField("country", titleCase(v)); count++; } break;
+      case "jobCategory": case "workType": case "tradeType": case "leadSource":
+        if (v) { setField(field, titleCase(v)); count++; } break;
+      case "phone": {
+        if (phoneDigits(v).length >= 7) { setPhone(word + " " + v); count++; }
+        else {
+          // a bare "cell" / "home" after a number sets that number's type
+          const t = phoneTypeFrom(word + " " + v);
+          const rows = [...$("phones").children].filter(r => r.querySelector(".ph-num").value);
+          const r = rows[rows.length - 1];
+          if (t && r && !r.querySelector(".ph-type").value) { r.querySelector(".ph-type").value = t; count++; }
+        }
+        break;
+      }
+      case "ext": {
+        const d = phoneDigits(v);
+        if (d) { const rows = [...$("phones").children].filter(r => r.querySelector(".ph-num").value); const r = rows[rows.length - 1] || $("phones").children[0]; r.querySelector(".ph-ext").value = d; count++; }
+        break;
+      }
+      case "email": if (v) { setEmail(v); count++; } break;
+      case "ageProduct": {
+        const val = word === "years old" ? "" : v;
+        if (val) { setField("ageProduct", val); count++; }
+        break;
+      }
+      case "homeowner": { const yn = yesNo(v || word) || (/(owns|own the)/.test(word) ? "Yes" : "Yes"); setField("homeowner", /\bnot?\b/i.test(v) ? "No" : yn); count++; break; }
+      case "apptConfirmed": { setField("apptConfirmed", yesNo(v) || "Yes"); count++; break; }
+      case "jobMin": {
+        const amt = amountFrom(v); if (amt) setField("jobMinAmount", amt);
+        setField("jobMinQuoted", yesNo(v) || (amt ? "Yes" : "")); count++; break;
+      }
+      case "spouse": {
+        const yn = yesNo(v); setField("spouse", yn || "Yes");
+        const nm = spouseNameFrom(v); if (nm && yn !== "No") setField("spouseName", nm); count++; break;
+      }
+      case "attic": { setField("attic", yesNo(v, true) || (/\bno\b/.test(word) ? "No" : "Yes")); count++; break; }
+      case "repairReplace": {
+        const o = pickOption(word + " " + v, ["Replace", "Repair"]);
+        if (word === "repair or replace") { const p = pickOption(v, ["Replace", "Repair"]); if (p) setField("repairReplace", p); }
+        else if (o) setField("repairReplace", o);
+        count++; break;
+      }
+      case "scope": { const o = pickOption(v, ["Full", "Partial"]); if (o) { setField("scope", o); count++; } break; }
+      case "booked": if (v) { setField("booked", v); count++; } break;
+      case "callBack": if (v) { setField("callBack", v); count++; } break;
+      case "classification": { const o = pickOption(v, ["Booking", "Future", "Referral"]); if (o) { setField("classification", o); count++; } break; }
+    }
+  }
+  onChange();
+  return count;
+}
+
+/* ---------------- Guided interview ---------------- */
+const QUESTIONS = [
+  { f: "firstName", q: "What's the customer's first name?", type: "name" },
+  { f: "lastName", q: "And their last name?", type: "name" },
+  { f: "company", q: "Company name? Say skip if it's a homeowner.", type: "text", optional: true },
+  { f: "leadSource", q: "How did they hear about us? What's the lead source?", type: "title" },
+  { f: "phone", q: "What's the best phone number? Say if it's cell or home.", type: "phone" },
+  { f: "phoneType", q: "Is that a cell or home number?", type: "phoneType", when: () => { const p = getPhones()[0]; return p && p.number && !p.type; } },
+  { f: "phone2", q: "Any other phone number? Say no if not.", type: "phone2", optional: true },
+  { f: "email", q: "What's their email address?", type: "email", optional: true },
+  { f: "street", q: "What's the street address?", type: "street" },
+  { f: "unit", q: "Suite, apartment or unit number? Say no if none.", type: "unit", optional: true },
+  { f: "city", q: "What city?", type: "title" },
+  { f: "province", q: "Province?", type: "prov" },
+  { f: "postal", q: "Postal code?", type: "postal" },
+  { f: "jobCategory", q: "Is this residential or commercial?", type: "choice", opts: ["Residential", "Commercial"] },
+  { f: "tradeType", q: "What trade is it? For example furnace, roofing, windows.", type: "title" },
+  { f: "workType", q: "What type of work? Repair, replacement, new install or service?", type: "title" },
+  { f: "ageProduct", q: "How old is the current product?", type: "age" },
+  { f: "homeowner", q: "Are they the homeowner?", type: "yn" },
+  { f: "repairReplace", q: "Are they looking to repair or replace?", type: "choice", opts: ["Repair", "Replace"] },
+  { f: "scope", q: "Is the scope full or partial?", type: "choice", opts: ["Full", "Partial"] },
+  { f: "attic", q: "Is there attic access? Yes, no, or not applicable.", type: "ynna" },
+  { f: "spouse", q: "Is there a spouse in the house? If yes, what's their name?", type: "spouse" },
+  { f: "jobMinQuoted", q: "Was the job minimum quoted? If yes, how much?", type: "jobmin" },
+  { f: "timeline", q: "What's their timeline?", type: "text" },
+  { f: "classification", q: "Is this a booking, a future, or a referral?", type: "choice", opts: ["Booking", "Future", "Referral"] },
+  { f: "booked", q: "What day and time is it booked for?", type: "text", when: () => segState.classification === "Booking" || segState.classification === "Referral" },
+  { f: "apptConfirmed", q: "Did they confirm 60 to 90 minutes for the appointment?", type: "yn", when: () => segState.classification === "Booking" || !!$("booked").value },
+  { f: "callBack", q: "When should we call them back?", type: "text", when: () => segState.classification !== "Booking" },
+  { f: "notes", q: "Any notes? Motivation, pain points, anything the consultant should know.", type: "notes", optional: true }
+];
+let qi = -1, interviewOn = false, freeMode = false;
+let lastSpokenQ = "";
+
+function fieldFilled(q) {
+  switch (q.f) {
+    case "phone": return !!(getPhones()[0] || {}).number;
+    case "phoneType": return !!(getPhones()[0] || {}).type;
+    case "phone2": return getPhones().filter(p => p.number).length > 1;
+    case "email": return getEmails().some(e => e.address);
+    default: return SEG_FIELDS.includes(q.f) ? !!segState[q.f] : !!($(q.f) && $(q.f).value.trim());
+  }
+}
+function nextIndex(from, dir) {
+  let i = from + dir;
+  while (i >= 0 && i < QUESTIONS.length) {
+    const q = QUESTIONS[i];
+    const skipFilled = $("onlyEmpty").checked && dir > 0 && fieldFilled(q);
+    if ((!q.when || q.when()) && !skipFilled) return i;
+    i += dir;
+  }
+  return dir > 0 ? QUESTIONS.length : -1;
+}
+function showQuestion() {
+  $("progBar").style.width = Math.round(Math.max(0, qi) / QUESTIONS.length * 100) + "%";
+  if (qi >= QUESTIONS.length) { finishInterview(); return; }
+  const q = QUESTIONS[qi];
+  $("qText").textContent = q.q;
+  $("qHint").textContent = (q.opts ? "Options: " + q.opts.join(", ") + ". " : "") + 'Say "skip", "back", "repeat" or "stop".';
+  $("heard").textContent = "";
+  $("typedAnswer").value = "";
+  const el = $(q.f); if (el && el.focus && window.innerWidth > 700) el.scrollIntoView({ block: "center", behavior: "smooth" });
+  speak(q.q, () => listen());
+}
+function finishInterview() {
+  interviewOn = false; stopListening();
+  $("progBar").style.width = "100%";
+  $("qText").textContent = "All done. Check the form, then open the Write-up tab.";
+  $("qHint").textContent = "";
+  speak("All done.", null);
+  saveDraft();
+}
+function startInterview() {
+  freeMode = false; interviewOn = true;
+  qi = nextIndex(-1, 1);
+  showQuestion();
+}
+function handleAnswer(raw) {
+  const text = clean(raw);
+  if (!text) return;
+  const lower = text.toLowerCase();
+  $("heard").textContent = text;
+  if (freeMode) {
+    const n = applyParsed(parseFreeText(text));
+    $("micStatus").textContent = n ? `Filled ${n} field${n === 1 ? "" : "s"}. Keep talking or tap the mic to stop.` : "Didn't catch a field name. Start with the field, like \"first name John\".";
+    return;
+  }
+  if (!interviewOn) return;
+  if (/^(stop|pause|quit|cancel|end)( interview| listening)?\.?$/.test(lower)) { stopInterview(); return; }
+  if (/^(repeat|say again|what|pardon|sorry)\??\.?$/.test(lower)) { showQuestion(); return; }
+  if (/^(back|go back|previous)\.?$/.test(lower)) { qi = Math.max(0, nextIndexBack()); showQuestion(); return; }
+  if (/^(skip|next|pass|skip it|skip that|i don't know|don't know|unknown)\.?$/.test(lower)) { advance(); return; }
+  applyAnswer(QUESTIONS[qi], text);
+  onChange();
+  advance();
+}
+function nextIndexBack() {
+  let i = qi - 1;
+  while (i > 0 && QUESTIONS[i].when && !QUESTIONS[i].when()) i--;
+  return i;
+}
+function advance() { qi = nextIndex(qi, 1); setTimeout(showQuestion, 250); }
+function applyAnswer(q, text) {
+  const lower = text.toLowerCase();
+  const isNo = /^(no|nope|none|nah|n\/a|not applicable|no there isn't|there isn't)\.?$/.test(lower);
+  switch (q.type) {
+    case "name": setField(q.f, titleCase(text.replace(/^(it's|its|it is|his name is|her name is|their name is|name is)\s+/i, "").replace(/[.]/g, ""))); break;
+    case "title": setField(q.f, titleCase(text.replace(/[.]$/, ""))); break;
+    case "text": setField(q.f, text.replace(/[.]$/, "")); break;
+    case "notes": if (!isNo) setField(q.f, sentence(text)); break;
+    case "street": setField(q.f, titleCase(text.replace(/[.]$/, ""))); break;
+    case "unit": if (!isNo) setField(q.f, text.toUpperCase().replace(/^(UNIT|SUITE|APT|APARTMENT|NUMBER)\s*/, "").replace(/[.]$/, "")); break;
+    case "prov": setField(q.f, normProv(text)); break;
+    case "postal": setField(q.f, normPostal(text)); break;
+    case "age": setField(q.f, text.replace(/[.]$/, "").replace(/^(it's|its|it is|about|around)\s+/i, "")); break;
+    case "email": if (!isNo) setEmail(text); break;
+    case "phone": setPhone(text, $("phones").children[0]); break;
+    case "phoneType": { const t = phoneTypeFrom(text); if (t) { $("phones").children[0].querySelector(".ph-type").value = t; flash($("phones").children[0].querySelector(".ph-type")); } break; }
+    case "phone2": if (!isNo && phoneDigits(text).length >= 7) { const r = addPhoneRow(); setPhone(text, r); } break;
+    case "yn": { const v = yesNo(text); if (v) setField(q.f, v); break; }
+    case "ynna": { const v = yesNo(text, true); if (v) setField(q.f, v); break; }
+    case "choice": { const v = pickOption(text, q.opts); if (v) setField(q.f, v); else $("micStatus").textContent = `Didn't match ${q.opts.join(" / ")}. Tap the right button or say "back".`; break; }
+    case "spouse": {
+      const v = yesNo(text) || (spouseNameFrom(text) ? "Yes" : "");
+      if (v) setField("spouse", v);
+      if (v === "Yes") { const n = spouseNameFrom(text); if (n) setField("spouseName", n); }
+      break;
+    }
+    case "jobmin": {
+      const amt = amountFrom(text);
+      const v = yesNo(text) || (amt ? "Yes" : "");
+      if (v) setField("jobMinQuoted", v);
+      if (amt) setField("jobMinAmount", amt);
+      break;
+    }
+  }
+}
+function stopInterview() {
+  interviewOn = false; freeMode = false; stopListening();
+  $("qText").textContent = "Stopped. Tap \"Ask me the questions\" to pick up where you left off.";
+  $("qHint").textContent = "";
+  saveDraft();
+}
+
+/* ---------------- Speech in / out ---------------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, listening = false, wantListen = false;
+function speak(text, done) {
+  if (!$("speakToggle").checked || !window.speechSynthesis) { done && done(); return; }
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.05; u.lang = "en-CA";
+    let called = false;
+    const fin = () => { if (!called) { called = true; done && setTimeout(done, 150); } };
+    u.onend = fin; u.onerror = fin;
+    setTimeout(fin, 900 + text.length * 70); // safety net if onend never fires
+    speechSynthesis.speak(u);
+  } catch (e) { done && done(); }
+}
+function setMicUI() {
+  $("micBtn").classList.toggle("live", listening);
+}
+function listen() {
+  if (!SR) { $("micStatus").textContent = "Voice input isn't supported in this browser. Use Chrome or Safari, or type the answers."; $("typedAnswer").focus(); return; }
+  wantListen = true;
+  if (listening) return;
+  try {
+    rec = new SR();
+    rec.lang = "en-CA";
+    rec.interimResults = true;
+    rec.continuous = freeMode;
+    rec.maxAlternatives = 1;
+    rec.onstart = () => { listening = true; setMicUI(); $("micStatus").textContent = freeMode ? "Listening. Say a field then the value, like \"phone 905 555 1234 cell\"." : "Listening..."; };
+    rec.onresult = (ev) => {
+      let interim = "", finalText = "";
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const r = ev.results[i];
+        if (r.isFinal) finalText += r[0].transcript; else interim += r[0].transcript;
+      }
+      if (interim) $("heard").textContent = interim;
+      if (finalText) {
+        if (!freeMode) { wantListen = false; try { rec.stop(); } catch (e) {} }
+        handleAnswer(finalText);
+      }
+    };
+    rec.onerror = (ev) => {
+      if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
+        wantListen = false;
+        $("micStatus").textContent = "Microphone blocked. Allow mic access for this page in your browser settings, or type the answers.";
+      } else if (ev.error === "no-speech") {
+        $("micStatus").textContent = "Didn't hear anything. Listening again...";
+      } else {
+        $("micStatus").textContent = "Mic error: " + ev.error;
+      }
+    };
+    rec.onend = () => {
+      listening = false; setMicUI();
+      if (wantListen && (interviewOn || freeMode)) setTimeout(listen, 200);
+    };
+    rec.start();
+  } catch (e) {
+    $("micStatus").textContent = "Couldn't start the mic: " + e.message;
+  }
+}
+function stopListening() {
+  wantListen = false;
+  if (rec) { try { rec.stop(); } catch (e) {} }
+  listening = false; setMicUI();
+  if (window.speechSynthesis) speechSynthesis.cancel();
+}
+
+/* ---------------- Saving ---------------- */
+function getSaved() { try { return JSON.parse(safeGet(STORE_KEY) || "[]"); } catch (e) { return []; } }
+function putSaved(list) { safeSet(STORE_KEY, JSON.stringify(list)); }
+let currentId = null;
+function saveLead() {
+  const d = collect();
+  if (!d.firstName && !d.lastName && !d.phones.length) { toast("Add at least a name or phone first"); return; }
+  const list = getSaved();
+  d.id = currentId || ("L" + Date.now());
+  d.savedAt = new Date().toISOString();
+  d.classification = d.classification || suggestClass(d);
+  const i = list.findIndex(x => x.id === d.id);
+  if (i >= 0) list[i] = d; else list.unshift(d);
+  putSaved(list); currentId = d.id;
+  renderSaved(); toast("Lead saved");
+}
+function renderSaved() {
+  const list = getSaved();
+  const box = $("savedList");
+  if (!list.length) { box.innerHTML = '<p class="muted">No saved leads yet.</p>'; return; }
+  box.innerHTML = "";
+  list.forEach(l => {
+    const row = document.createElement("div");
+    row.className = "saved-item";
+    const cls = l.classification || "Unclassified";
+    const nm = clean((l.firstName || "") + " " + (l.lastName || "")) || "(no name)";
+    const when = new Date(l.savedAt).toLocaleString("en-CA", { dateStyle: "medium", timeStyle: "short" });
+    row.innerHTML = `<div><strong></strong> <span class="badge ${cls.toLowerCase()}">${cls}</span><div class="muted"></div></div>
+      <div class="row"><button class="ghost" data-a="open">Open</button><button class="ghost" data-a="write">Write-up</button><button class="danger" data-a="del">Delete</button></div>`;
+    row.querySelector("strong").textContent = nm;
+    row.querySelector(".muted").textContent = [l.city, (l.phones && l.phones[0] || {}).number, l.booked && "Booked " + l.booked, "Saved " + when].filter(Boolean).join(" · ");
+    row.querySelector('[data-a="open"]').onclick = () => { currentId = l.id; load(l); showTab("form"); };
+    row.querySelector('[data-a="write"]').onclick = () => { currentId = l.id; load(l); showTab("writeup"); };
+    row.querySelector('[data-a="del"]').onclick = () => { if (confirm("Delete " + nm + "?")) { putSaved(getSaved().filter(x => x.id !== l.id)); if (currentId === l.id) currentId = null; renderSaved(); } };
+    box.appendChild(row);
+  });
+}
+function saveDraft() { safeSet(DRAFT_KEY, JSON.stringify(collect())); }
+
+/* ---------------- Tabs and events ---------------- */
+function showTab(t) {
+  document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === t));
+  ["form", "writeup", "saved"].forEach(x => $("tab-" + x).classList.toggle("hidden", x !== t));
+  if (t === "writeup") renderWriteup();
+  if (t === "saved") renderSaved();
+  window.scrollTo(0, 0);
+}
+let draftTimer = null;
+function onChange() {
+  updateBadge();
+  clearTimeout(draftTimer); draftTimer = setTimeout(saveDraft, 500);
+}
+
+document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
+TEXT_FIELDS.forEach(f => $(f).addEventListener("input", onChange));
+$("postal").addEventListener("blur", e => { e.target.value = normPostal(e.target.value); onChange(); });
+$("province").addEventListener("blur", e => { if (e.target.value) e.target.value = normProv(e.target.value); onChange(); });
+$("bookedPick").addEventListener("change", e => { $("booked").value = formatPick(e.target.value); flash($("booked")); onChange(); });
+$("callBackPick").addEventListener("change", e => { $("callBack").value = formatPick(e.target.value); flash($("callBack")); onChange(); });
+$("addPhone").onclick = () => { addPhoneRow(); };
+$("addEmail").onclick = () => { addEmailRow(); };
+$("startInterview").onclick = () => { stopListening(); startInterview(); };
+$("freeDictate").onclick = () => {
+  stopListening(); interviewOn = false; freeMode = true;
+  $("qText").textContent = "Go ahead and talk. Say the field name, then the answer.";
+  $("qHint").textContent = 'Example: "first name John last name Smith phone 905 555 1234 cell city Burlington attic access yes". Say "notes" last.';
+  listen();
+};
+$("micBtn").onclick = () => {
+  if (listening || wantListen) { stopListening(); $("micStatus").textContent = "Mic off."; return; }
+  if (interviewOn) listen(); else $("freeDictate").click();
+};
+$("btnSkip").onclick = () => { if (interviewOn) { stopListening(); wantListen = false; advance(); } };
+$("btnBack").onclick = () => { if (interviewOn) { stopListening(); qi = Math.max(0, nextIndexBack()); showQuestion(); } };
+$("btnStop").onclick = stopInterview;
+$("typedAnswer").addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  const v = e.target.value; e.target.value = "";
+  if (!interviewOn && !freeMode) { const n = applyParsed(parseFreeText(v)); toast(n ? `Filled ${n} field(s)` : "Start with a field name, like \"city Burlington\""); return; }
+  stopListening(); wantListen = false;
+  handleAnswer(v);
+});
+$("saveLead").onclick = saveLead;
+$("toWriteup").onclick = () => showTab("writeup");
+$("newLead").onclick = () => { if (confirm("Clear the form and start a new lead?")) { currentId = null; load({}); stopInterview(); $("qText").textContent = "Tap \"Ask me the questions\" to start."; } };
+$("refreshWriteup").onclick = renderWriteup;
+$("printWriteup").onclick = () => { renderWriteup(); window.print(); };
+$("copyWriteup").onclick = () => {
+  const text = renderWriteup().paragraphs.join("\n\n");
+  const done = () => toast("Copied");
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+  else fallbackCopy(text, done);
+};
+function fallbackCopy(text, done) {
+  const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select();
+  try { document.execCommand("copy"); done(); } catch (e) { toast("Copy failed, select the text manually"); }
+  ta.remove();
+}
+$("importBtn").onclick = () => {
+  const txt = $("importText").value;
+  if (!txt.trim()) { toast("Paste the form details first"); return; }
+  if ($("importReplace").checked) { currentId = null; load({}); }
+  let n = 0;
+  try { const j = JSON.parse(txt); if (j && typeof j === "object" && (j.firstName || j.phones)) { load(j); n = 1; } } catch (e) {}
+  if (!n) n = applyParsed(parseFreeText(txt));
+  renderWriteup();
+  toast(n ? `Filled ${n} field(s). Check the Form tab for anything missed.` : "Couldn't find any field names in that text");
+};
+$("exportBtn").onclick = () => {
+  const blob = new Blob([JSON.stringify(getSaved(), null, 2)], { type: "application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = "leads-" + new Date().toISOString().slice(0, 10) + ".json"; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$("importFile").addEventListener("change", e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const incoming = JSON.parse(r.result);
+      const arr = Array.isArray(incoming) ? incoming : [incoming];
+      const list = getSaved();
+      arr.forEach(l => { if (!l.id) l.id = "L" + Date.now() + Math.random().toString(36).slice(2, 6); if (!list.some(x => x.id === l.id)) list.push(l); });
+      putSaved(list); renderSaved(); toast(`Imported ${arr.length} lead(s)`);
+    } catch (err) { toast("That file isn't valid lead JSON"); }
+  };
+  r.readAsText(f); e.target.value = "";
+});
+
+/* ---------------- Init ---------------- */
+let draft = null;
+try { draft = JSON.parse(safeGet(DRAFT_KEY) || "null"); } catch (e) {}
+load(draft || {});
+if (!SR) $("micStatus").textContent = "Voice input isn't available in this browser (works in Chrome, Edge and Safari). You can still type answers in the box.";
+
+// expose for testing
+window.LeadIntake = { parseFreeText, applyParsed, buildWriteup, collect, load, handleAnswer, startInterview, normEmail, formatPhone };
+})();
+</script>
+</body>
+</html>
