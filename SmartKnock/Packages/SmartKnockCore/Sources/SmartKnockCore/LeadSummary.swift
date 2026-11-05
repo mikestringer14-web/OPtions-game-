@@ -38,7 +38,8 @@ public enum TranscriptExtractor {
 
     static let phonePattern = #"(?:\+?1[\s.\-]?)?\(?\b(\d{3})\)?[\s.\-]?(\d{3})[\s.\-]?(\d{4})\b"#
     static let emailPattern = #"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}"#
-    static let namePattern = #"(?:(?:his|her|their|the homeowner'?s?|owner'?s?) name is|name is|named|spoke (?:with|to)|talked (?:with|to)|homeowner is|met with)\s+([A-Z][a-zA-Z'\-]+(?:\s+[A-Z][a-zA-Z'\-]+)?)"#
+    /// Trigger phrase is case-insensitive; the captured name must be capitalized.
+    static let namePattern = #"(?i:\b(?:(?:his|her|their|the homeowner'?s?|owner'?s?) name is|name is|named|spoke (?:with|to)|talked (?:with|to)|homeowner is|met with))\s+([A-Z][a-zA-Z'\-]+(?:\s+[A-Z][a-zA-Z'\-]+)?)"#
 
     static let concernWords = [
         "leak", "leaking", "leaks", "missing", "damage", "damaged", "curl", "curling", "granule", "granules",

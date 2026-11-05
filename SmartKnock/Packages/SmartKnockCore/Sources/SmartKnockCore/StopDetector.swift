@@ -175,15 +175,28 @@ public final class StopDetector {
         let windowStart = sample.timestamp.addingTimeInterval(-config.minDwellSeconds)
         let window = recent.filter { $0.timestamp >= windowStart }
         guard let first = window.first,
-              sample.timestamp.timeIntervalSince(first.timestamp) >= config.minDwellSeconds * 0.8,
+              sample.timestamp.timeIntervalSince(first.timestamp) >= config.minDwellSeconds * 0.9,
               window.count >= 3,
               let center = GeoMath.weightedCentroid(window.map { ($0.point, $0.accuracy) })
         else { return [] }
 
-        // The window must also reach back far enough: require an older sample before it,
-        // or a full window of samples, so a single slow fix does not trigger a dwell.
-        let allInside = window.allSatisfy { GeoMath.distance($0.point, center) <= config.dwellRadius + min($0.accuracy, 10) * 0.5 }
+        // 1. Every fix must sit close to the centre (small allowance for GPS noise).
+        let allInside = window.allSatisfy {
+            GeoMath.distance($0.point, center) <= config.dwellRadius + min($0.accuracy, 10) * 0.3
+        }
         guard allInside else { return [] }
+
+        // 2. Net movement across the window must be small (rejects slow walking).
+        guard let last = window.last,
+              GeoMath.distance(first.point, last.point) <= config.dwellRadius + min(sample.accuracy, 10) * 0.5
+        else { return [] }
+
+        // 3. If the phone reports speed, the typical speed must be below walking pace
+        //    (rejects pacing back and forth, e.g. out to the sidewalk and back).
+        let speeds = window.map(\.speed).filter { $0 >= 0 }.sorted()
+        if speeds.count >= window.count / 2, !speeds.isEmpty, speeds[speeds.count / 2] >= config.walkingSpeedThreshold {
+            return []
+        }
 
         // Approach bearing: from the oldest sample outside the dwell radius to the centre.
         var bearing: Double?
