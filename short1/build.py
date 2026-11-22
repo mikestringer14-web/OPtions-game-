@@ -79,10 +79,10 @@ def main():
             f.write(f"file '{s}'\n")
     run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", "concat.txt",
          "-i", "voice.mp3",
-         "-filter_complex", "[0:v]ass=captions.ass[v];[1:a]apad=pad_dur=0.4,loudnorm=I=-14:TP=-1.5:LRA=11[a]",
-         "-map", "[v]", "-map", "[a]", "-t", "28.8",
+         "-filter_complex", "[0:v]ass=captions.ass[v]",
+         "-map", "[v]", "-map", "1:a", "-t", "28.8",
          "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p",
-         "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
+         "-c:a", "copy", "-movflags", "+faststart",
          "Bizstring_Short1_No_Right_Answers.mp4"])
 
 
