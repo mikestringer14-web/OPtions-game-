@@ -1,0 +1,11 @@
+# render intermediates
+seg_*.mp4
+f_*.png
+g_*.png
+*_crop.png
+contact.png
+crops.png
+grid.png
+pan.png
+testC.png
+concat.txt

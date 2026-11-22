@@ -1,0 +1,33 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Cap,Inter ExtraBold,68,&H00332A1F,&H000000FF,&H00F2F7FB,&H00000000,-1,0,0,0,100,100,0,0,1,0,0,2,70,70,95,1
+Style: Hit,Inter ExtraBold,96,&H002E2FD8,&H000000FF,&H00F2F7FB,&H00000000,-1,0,0,0,100,100,2,0,1,0,0,2,70,70,110,1
+Style: Handle,Inter ExtraBold,42,&H00332A1F,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,1,0,1,0,0,8,40,40,120,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:29.00,Handle,,0,0,0,,@Bizstring
+Dialogue: 1,0:00:00.00,0:00:01.92,Cap,,0,0,0,,{\fad(60,0)}Would you take a test with no right answers,
+Dialogue: 1,0:00:01.92,0:00:04.70,Cap,,0,0,0,,if your personality was judged on every single one?
+Dialogue: 1,0:00:04.80,0:00:06.40,Cap,,0,0,0,,You might have already taken it.
+Dialogue: 1,0:00:06.65,0:00:08.60,Cap,,0,0,0,,Some employers send {\c&H2E2FD8&}dark personality tests
+Dialogue: 1,0:00:08.60,0:00:10.45,Cap,,0,0,0,,before you ever get an interview.
+Dialogue: 1,0:00:10.50,0:00:11.55,Cap,,0,0,0,,Here's how they work.
+Dialogue: 1,0:00:11.55,0:00:13.55,Cap,,0,0,0,,A coworker steals your idea.
+Dialogue: 1,0:00:13.70,0:00:15.15,Cap,,0,0,0,,Call them out in front of everyone?
+Dialogue: 1,0:00:15.15,0:00:16.00,Hit,,0,0,0,,{\fscx80\fscy80\t(0,120,\fscx100\fscy100)}NARCISSIST
+Dialogue: 1,0:00:16.00,0:00:17.25,Cap,,0,0,0,,Quietly tell the boss?
+Dialogue: 1,0:00:17.25,0:00:18.15,Hit,,0,0,0,,{\fscx80\fscy80\t(0,120,\fscx100\fscy100)}MANIPULATOR
+Dialogue: 1,0:00:18.15,0:00:19.95,Cap,,0,0,0,,Let it go and never trust them again?
+Dialogue: 1,0:00:19.95,0:00:20.90,Hit,,0,0,0,,{\fscx80\fscy80\t(0,120,\fscx100\fscy100)}COLD
+Dialogue: 1,0:00:20.90,0:00:22.45,Cap,,0,0,0,,Every answer gets {\c&H2E2FD8&}flagged.
+Dialogue: 1,0:00:22.45,0:00:24.75,Cap,,0,0,0,,Try it yourself. The test's in the comments
+Dialogue: 1,0:00:24.75,0:00:25.82,Cap,,0,0,0,,There's no right answer.
+Dialogue: 1,0:00:25.82,0:00:28.70,Cap,,0,0,0,,So would you still take a test with no right answers?
