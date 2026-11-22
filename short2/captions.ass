@@ -1,0 +1,51 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Cap,Inter ExtraBold,66,&H00FFFFFF,&H000000FF,&H00241A12,&H64000000,-1,0,0,0,100,100,0,0,1,6,3,2,80,80,330,1
+Style: Hit,Inter ExtraBold,110,&H002E2FD8,&H000000FF,&H00FFFFFF,&H64000000,-1,0,0,0,100,100,2,0,1,7,3,2,80,80,330,1
+Style: Badge,Inter ExtraBold,52,&H00241A12,&H000000FF,&H00CCE4F2,&H00CCE4F2,-1,0,0,0,100,100,1,0,3,18,0,8,60,60,150,1
+Style: Handle,Inter ExtraBold,96,&H00241A12,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,1,0,1,0,0,8,60,60,230,1
+Style: Sub,Inter ExtraBold,46,&H002E2FD8,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,1,0,1,0,0,8,60,60,350,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 2,0:00:00.00,0:00:06.25,Badge,,0,0,0,,5 SECRETS EMPLOYERS USE
+Dialogue: 2,0:00:06.25,0:00:19.60,Badge,,0,0,0,,#5  THE DARK TEST
+Dialogue: 2,0:00:19.60,0:00:28.65,Badge,,0,0,0,,#4  BRAIN GAMES
+Dialogue: 2,0:00:28.65,0:00:35.20,Badge,,0,0,0,,#3  YOUR SECRET COMPETITION
+Dialogue: 2,0:00:35.20,0:00:42.75,Badge,,0,0,0,,#2  SOMEONE'S WATCHING
+Dialogue: 2,0:00:42.75,0:00:51.00,Badge,,0,0,0,,#1  THE HIDDEN LIST
+Dialogue: 2,0:00:51.00,0:00:57.90,Handle,,0,0,0,,{\fad(250,0)}@Bizstring
+Dialogue: 2,0:00:51.30,0:00:57.90,Sub,,0,0,0,,{\fad(250,0)}FOLLOW FOR MORE
+Dialogue: 1,0:00:00.00,0:00:03.30,Cap,,0,0,0,,Five secret ways employers judge you before you're even hired
+Dialogue: 1,0:00:03.30,0:00:06.25,Cap,,0,0,0,,The last one is a list you might not know you're on
+Dialogue: 1,0:00:06.30,0:00:07.30,Hit,,0,0,0,,{\fscx80\fscy80\t(0,120,\fscx100\fscy100)}NUMBER 5
+Dialogue: 1,0:00:07.30,0:00:09.25,Cap,,0,0,0,,A test with no right answers
+Dialogue: 1,0:00:09.25,0:00:11.40,Cap,,0,0,0,,It's called a {\c&H2E2FD8&}dark personality test
+Dialogue: 1,0:00:11.40,0:00:13.25,Cap,,0,0,0,,The {\c&H2E2FD8&}Hogan{\c&HFFFFFF&} is the best known
+Dialogue: 1,0:00:13.25,0:00:15.60,Cap,,0,0,0,,It measures how you act under stress
+Dialogue: 1,0:00:15.60,0:00:19.60,Cap,,0,0,0,,and some tests screen for {\c&H2E2FD8&}narcissism{\c&HFFFFFF&} and {\c&H2E2FD8&}manipulation
+Dialogue: 1,0:00:19.70,0:00:20.60,Hit,,0,0,0,,{\fscx80\fscy80\t(0,120,\fscx100\fscy100)}4
+Dialogue: 1,0:00:20.60,0:00:21.95,Cap,,0,0,0,,Brain games
+Dialogue: 1,0:00:21.95,0:00:24.90,Cap,,0,0,0,,That quick game in your application isn't just a game
+Dialogue: 1,0:00:24.90,0:00:27.00,Cap,,0,0,0,,It can measure how {\c&H2E2FD8&}impulsive{\c&HFFFFFF&} you are
+Dialogue: 1,0:00:27.00,0:00:28.70,Cap,,0,0,0,,and how much risk you take
+Dialogue: 1,0:00:28.80,0:00:29.70,Hit,,0,0,0,,{\fscx80\fscy80\t(0,120,\fscx100\fscy100)}3
+Dialogue: 1,0:00:29.70,0:00:31.80,Cap,,0,0,0,,You're compared to people you've never met
+Dialogue: 1,0:00:31.80,0:00:35.20,Cap,,0,0,0,,AI scores your resume against the people they {\c&H2E2FD8&}already hired
+Dialogue: 1,0:00:35.35,0:00:36.20,Hit,,0,0,0,,{\fscx80\fscy80\t(0,120,\fscx100\fscy100)}2
+Dialogue: 1,0:00:36.20,0:00:37.90,Cap,,0,0,0,,Someone's watching your feed
+Dialogue: 1,0:00:37.90,0:00:40.10,Cap,,0,0,0,,AI tools scan your public posts
+Dialogue: 1,0:00:40.10,0:00:42.80,Cap,,0,0,0,,and some companies keep scanning {\c&H2E2FD8&}after you're hired
+Dialogue: 1,0:00:42.90,0:00:43.95,Hit,,0,0,0,,{\fscx80\fscy80\t(0,120,\fscx100\fscy100)}NUMBER 1
+Dialogue: 1,0:00:43.95,0:00:48.10,Cap,,0,0,0,,Some U.S. retailers share databases of workers accused of {\c&H2E2FD8&}theft
+Dialogue: 1,0:00:48.10,0:00:51.10,Cap,,0,0,0,,Some people on those lists were {\c&H2E2FD8&}never even charged
+Dialogue: 1,0:00:51.20,0:00:53.80,Cap,,0,0,0,,What's the worst thing an employer has ever done to you?
+Dialogue: 1,0:00:53.80,0:00:55.05,Cap,,0,0,0,,Tell me in the comments
+Dialogue: 1,0:00:55.05,0:00:57.90,Cap,,0,0,0,,Like and share with someone who's job hunting
