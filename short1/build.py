@@ -82,7 +82,7 @@ def main():
          "-filter_complex", "[0:v]ass=captions.ass[v]",
          "-map", "[v]", "-map", "1:a", "-t", "28.8",
          "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p",
-         "-c:a", "copy", "-movflags", "+faststart",
+         "-c:a", "aac", "-b:a", "256k", "-ar", "44100", "-ac", "2", "-movflags", "+faststart",
          "Bizstring_Short1_No_Right_Answers.mp4"])
 
 
