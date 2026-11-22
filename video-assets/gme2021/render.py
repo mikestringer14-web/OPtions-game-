@@ -12,7 +12,7 @@ SUB = ImageFont.truetype("/usr/share/fonts/opentype/inter/Inter-SemiBold.otf", 3
 BEATS = [
     ("wsb-banner.jpg", 0.0, 9.3, "r/wallstreetbets", "Jan 2021",
      [(0.0, .5, .5, 1.0), (5.6, .5, .5, 1.15), (6.9, .42, .86, 1.9), (9.3, .42, .86, 2.0)]),
-    ("dfv-yolo-updates.jpg", 9.3, 23.6, "Roaring Kitty's YOLO", "u/DeepFuckingValue",
+    ("dfv-yolo-updates-clean.jpg", 9.3, 23.6, "Roaring Kitty's YOLO", "Keith Gill, a.k.a. Roaring Kitty",
      [(9.3, .5, .5, 1.0), (15.4, .55, .45, 1.15), (16.4, .62, .76, 1.7), (18.9, .62, .76, 1.75), (20.6, .9, .83, 2.6), (23.6, .9, .83, 2.7)]),
     ("statista-saga-chart.jpg", 23.6, 39.5, "The run", "GME closing prices, Jan 2021",
      [(23.6, .5, .5, 1.0), (24.9, .25, .69, 2.4), (29.4, .26, .56, 2.4), (31.8, .52, .47, 2.3), (36.3, .6, .32, 2.2), (39.5, .62, .32, 2.3)]),
