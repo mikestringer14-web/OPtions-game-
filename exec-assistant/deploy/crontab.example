@@ -1,0 +1,8 @@
+# On the server: crontab -e. Paste, then fill in the token.
+TZ=America/Toronto
+EA_ADMIN_TOKEN=paste-your-token
+# Gmail poll every 10 minutes (only after Google OAuth is set up)
+*/10 * * * * curl -s -X POST -H "Authorization: Bearer $EA_ADMIN_TOKEN" http://127.0.0.1:8000/api/google/poll >/dev/null
+# Morning briefing 6:00 and end-of-day briefing 22:30, pushed to your phone
+0 6 * * *   docker compose -f /srv/exec-assistant/deploy/docker-compose.yml exec -T assistant python scripts/send_briefing.py
+30 22 * * * docker compose -f /srv/exec-assistant/deploy/docker-compose.yml exec -T assistant python scripts/send_briefing.py

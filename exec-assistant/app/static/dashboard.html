@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assistant Console</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#16181d;--mute:#606775;--line:#e2e5ea;--acc:#2456d3;
+--crit:#c62828;--high:#d9730d;--norm:#2456d3;--low:#8a909c;--ok:#1f8a4c}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#171a21;--ink:#e8eaef;--mute:#9aa1ae;--line:#2a2f3a;--acc:#6f9bff;--low:#6b7280}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{position:sticky;top:0;background:var(--card);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;z-index:2}
+h1{font-size:17px;margin:0;flex:1}
+.pill{padding:3px 10px;border-radius:99px;border:1px solid var(--line);font-size:13px}
+.kill-on{background:var(--crit);color:#fff;border-color:var(--crit)}
+main{max-width:1100px;margin:0 auto;padding:16px;display:grid;gap:14px;grid-template-columns:1fr}
+@media(min-width:900px){main{grid-template-columns:1.4fr 1fr}}
+main>div{align-content:start}
+section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0}
+h2{font-size:14px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute);margin:0 0 10px}
+.item{border-top:1px solid var(--line);padding:9px 0}.item:first-of-type{border-top:0}
+.lvl{display:inline-block;font-size:11px;font-weight:700;text-transform:uppercase;padding:1px 7px;border-radius:5px;color:#fff;margin-right:6px}
+.critical{background:var(--crit)}.high{background:var(--high)}.normal{background:var(--norm)}.low{background:var(--low)}
+.meta{color:var(--mute);font-size:12.5px}
+button,select,input,textarea{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+button{cursor:pointer}button.pri{background:var(--acc);color:#fff;border-color:var(--acc)}button.danger{background:var(--crit);color:#fff;border-color:var(--crit)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+pre{white-space:pre-wrap;word-break:break-word;font:12.5px/1.45 ui-monospace,Menlo,Consolas,monospace;background:var(--bg);padding:10px;border-radius:8px;margin:0;max-height:340px;overflow:auto}
+.warn{color:var(--crit);font-weight:600}
+#login{max-width:420px;margin:60px auto;padding:0 16px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.stat{background:var(--bg);border-radius:8px;padding:8px}.stat b{font-size:20px;display:block}
+.tabs button{border-radius:99px}.tabs button.on{background:var(--ink);color:var(--card)}
+</style>
+</head>
+<body>
+<div id="login" hidden>
+  <h1>Assistant Console</h1>
+  <p class="meta">Enter your admin token. It is stored only in this browser.</p>
+  <div class="row"><input id="tok" type="password" placeholder="EA_ADMIN_TOKEN" style="flex:1"><button class="pri" onclick="saveTok()">Sign in</button></div>
+</div>
+
+<div id="app" hidden>
+<header>
+  <h1>Assistant Console</h1>
+  <select id="mode" onchange="setMode(this.value)" aria-label="Operating mode">
+    <option value="observer">Observer</option><option value="approval">Approval</option>
+    <option value="autonomous">Autonomous</option><option value="emergency">Emergency</option>
+  </select>
+  <button id="killbtn" onclick="toggleKill()">Kill switch</button>
+  <button onclick="load()">Refresh</button>
+</header>
+<main>
+  <div style="display:grid;gap:14px;min-width:0">
+    <section><h2>Priority alerts</h2><div id="alerts"></div></section>
+    <section>
+      <h2>Unified inbox</h2>
+      <div class="row tabs" id="tabs" style="margin-bottom:8px"></div>
+      <div id="inbox"></div>
+    </section>
+    <section><h2>Talk to the assistant</h2>
+      <div class="row"><input id="chat" placeholder="status, briefing, mode approval, or search: 'legal clinic'" style="flex:1" onkeydown="if(event.key==='Enter')sendChat()"><button class="pri" onclick="sendChat()">Send</button></div>
+      <pre id="chatout" style="margin-top:8px">Type "help" for commands.</pre>
+    </section>
+  </div>
+  <div style="display:grid;gap:14px;min-width:0">
+    <section><h2>Status</h2><div class="grid2" id="stats"></div><div id="integ" class="meta" style="margin-top:8px"></div></section>
+    <section><h2>Pending approvals</h2><div id="approvals"></div></section>
+    <section><h2>Open tasks and follow-ups</h2><div id="tasks"></div></section>
+    <section><h2>Memory</h2>
+      <div class="row"><input id="mq" placeholder="search memory" style="flex:1" onkeydown="if(event.key==='Enter')searchMem()"><button onclick="searchMem()">Search</button></div>
+      <div id="mem" style="margin-top:8px"></div></section>
+    <section><h2>Briefing</h2><button onclick="brief()">Build briefing</button><pre id="brief" style="margin-top:8px" hidden></pre></section>
+    <section><h2>Demo</h2><p class="meta">Runs a <b>simulated</b> missed call through the real pipeline.</p><button onclick="simulate()">Simulate incoming call</button></section>
+    <section><h2>Audit log</h2><pre id="audit"></pre></section>
+  </div>
+</main>
+</div>
+<script>
+let TOKEN=null, CH=null;
+try{TOKEN=localStorage.getItem('ea_token')}catch(e){}
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+async function api(path,opt={}){
+  const r=await fetch(path,{...opt,headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json',...(opt.headers||{})}});
+  if(r.status===401||r.status===503){showLogin(await r.text());throw new Error('auth')}
+  return r.json();
+}
+function showLogin(msg){$('app').hidden=true;$('login').hidden=false}
+function saveTok(){TOKEN=$('tok').value.trim();try{localStorage.setItem('ea_token',TOKEN)}catch(e){};boot()}
+async function boot(){if(!TOKEN){showLogin();return}$('login').hidden=true;$('app').hidden=false;load();setInterval(load,30000)}
+async function load(){
+  const s=await api('/api/state');
+  $('mode').value=s.mode;
+  const k=$('killbtn');k.textContent=s.kill_switch?'KILL SWITCH ON':'Kill switch';k.className=s.kill_switch?'kill-on':'';
+  $('stats').innerHTML=[['Pending approvals',s.counts.pending_approvals],['Open alerts',s.counts.open_alerts],['Open tasks',s.counts.open_tasks],['Last 24h',s.counts.interactions_24h],['Spend today $',s.spend_usd.today],['Spend month $',s.spend_usd.month]]
+    .map(([a,b])=>`<div class="stat"><b>${esc(b)}</b>${esc(a)}</div>`).join('');
+  $('integ').innerHTML=Object.entries(s.integrations).map(([k,v])=>`${esc(k)}: <b>${esc(v)}</b>`).join(' · ');
+  const al=await api('/api/alerts?limit=15');
+  $('alerts').innerHTML=al.filter(a=>a.status!=='acknowledged'&&a.priority!=='low').map(a=>`<div class="item"><span class="lvl ${a.priority}">${a.priority}</span><b>${esc(a.title)}</b>
+    <div style="white-space:pre-wrap">${esc(a.body)}</div><div class="meta">${esc(a.status)} · ${esc(a.channels)} ${a.delivery_log?'· '+esc(a.delivery_log):''} · ${esc(a.created_at)}</div>
+    <button onclick="ack(${a.id})">Acknowledge</button></div>`).join('')||'<p class="meta">Nothing needs you right now.</p>';
+  const chans=['all','call','sms','email'];
+  $('tabs').innerHTML=chans.map(c=>`<button class="${(CH||'all')===c?'on':''}" onclick="CH=${c==='all'?'null':`'${c}'`};load()">${c}</button>`).join('');
+  const ib=await api('/api/inbox?limit=30'+(CH?'&channel='+CH:''));
+  $('inbox').innerHTML=ib.map(i=>`<div class="item"><span class="lvl ${i.priority}">${i.priority}</span><b>${esc(i.contact||i.from_addr||'unknown')}</b> <span class="meta">${esc(i.channel)} · ${esc(i.occurred_at.slice(0,16).replace('T',' '))}</span>
+    ${i.injection_flag?'<div class="warn">Flagged: possible scam or manipulation attempt</div>':''}<div>${esc(i.summary)}</div>
+    <div class="meta">why: ${esc(i.priority_why)}</div><button onclick="openI(${i.id})">Transcript</button><pre id="t${i.id}" hidden></pre></div>`).join('')||'<p class="meta">Empty.</p>';
+  const ap=await api('/api/actions?status=pending');
+  $('approvals').innerHTML=ap.map(a=>`<div class="item"><b>#${a.id} ${esc(a.action_type)}</b> <span class="meta">${esc(a.sensitivity)}</span><pre>${esc(JSON.stringify(JSON.parse(a.payload),null,1))}</pre>
+    <div class="meta">${esc(a.reason)}</div><div class="row"><button class="pri" onclick="decide(${a.id},'approve')">Approve and send</button><button onclick="decide(${a.id},'reject')">Reject</button></div></div>`).join('')||'<p class="meta">None.</p>';
+  const ts=await api('/api/tasks');
+  $('tasks').innerHTML=ts.map(t=>`<div class="item"><b>#${t.id}</b> ${esc(t.title)} <span class="meta">${esc(t.kind)}${t.contact?' · '+esc(t.contact):''}</span> <button onclick="done(${t.id})">Done</button></div>`).join('')||'<p class="meta">All clear.</p>';
+  const au=await api('/api/audit?limit=25');
+  $('audit').textContent=au.map(a=>`${a.ts.slice(5,19)} ${a.actor} ${a.event} ${a.detail}`).join('\n');
+}
+async function openI(id){const p=$('t'+id);if(!p.hidden){p.hidden=true;return}const i=await api('/api/interactions/'+id);p.textContent=i.body;p.hidden=false}
+async function ack(id){await api(`/api/alerts/${id}/ack`,{method:'POST'});load()}
+async function done(id){await api(`/api/tasks/${id}/done`,{method:'POST'});load()}
+async function decide(id,v){const r=await api(`/api/actions/${id}/${v}`,{method:'POST'});alert(r.message);load()}
+async function setMode(m){await api('/api/mode',{method:'POST',body:JSON.stringify({mode:m})});load()}
+async function toggleKill(){const s=await api('/api/state');if(!s.kill_switch&&!confirm('Stop ALL outgoing messages now?'))return;await api('/api/kill',{method:'POST',body:JSON.stringify({on:!s.kill_switch})});load()}
+async function sendChat(){const m=$('chat').value;if(!m)return;const r=await api('/api/chat',{method:'POST',body:JSON.stringify({message:m})});$('chatout').textContent=r.reply;$('chat').value='';load()}
+async function brief(){const r=await api('/api/briefing');$('brief').hidden=false;$('brief').textContent=r.text}
+async function simulate(){const r=await api('/api/simulate/call',{method:'POST',body:'{}'});$('chatout').textContent='SIMULATED call ingested.\nPriority: '+r.priority+'\nSummary: '+r.summary+'\nAlert: '+JSON.stringify(r.alert);load()}
+async function searchMem(){const r=await api('/api/search?q='+encodeURIComponent($('mq').value));
+  $('mem').innerHTML=[...r.memories.map(m=>`<div class="item">#${m.id} <b>${esc(m.attribute)}</b>: ${esc(m.value)} <span class="meta">${esc(m.subject)} · ${m.verified?'verified':'unverified'} · ${esc(m.status)} · conf ${m.confidence}</span> <button onclick="delMem(${m.id})">Delete</button></div>`),
+  ...r.interactions.map(i=>`<div class="item"><span class="lvl ${i.priority}">${i.priority}</span>${esc(i.contact||'')}: ${esc(i.summary)}</div>`)].join('')||'<p class="meta">No match.</p>'}
+async function delMem(id){if(!confirm('Permanently delete this memory?'))return;await api('/api/memories/'+id,{method:'DELETE'});searchMem()}
+boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+# One small always-on server. Caddy provides automatic HTTPS (Twilio and ElevenLabs webhooks require it).
+services:
+  assistant:
+    build: ..
+    env_file: ../.env
+    volumes: ["ea-data:/data"]
+    restart: unless-stopped
+  caddy:
+    image: caddy:2
+    ports: ["80:80", "443:443"]
+    volumes: ["./Caddyfile:/etc/caddy/Caddyfile", "caddy-data:/data"]
+    restart: unless-stopped
+  backup:
+    # Nightly encrypted database backup. See scripts/backup.sh and docs/SECURITY.md.
+    image: alpine:3.20
+    volumes: ["ea-data:/data:ro", "./backups:/backups", "./age-recipient.txt:/age-recipient.txt:ro", "../scripts/backup.sh:/backup.sh:ro"]
+    entrypoint: ["/bin/sh", "/backup.sh"]
+    restart: unless-stopped
+volumes:
+  ea-data: {}
+  caddy-data: {}

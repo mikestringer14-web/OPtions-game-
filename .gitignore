@@ -17,3 +17,11 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+
+# exec-assistant runtime data
+exec-assistant/data/
+exec-assistant/deploy/backups/
+exec-assistant/deploy/age-recipient.txt
+*.db
+*.db-wal
+*.db-shm

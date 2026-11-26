@@ -1,0 +1,4 @@
+# Replace with your domain. A free DuckDNS name pointed at the server works.
+assistant.example.com {
+    reverse_proxy assistant:8000
+}
